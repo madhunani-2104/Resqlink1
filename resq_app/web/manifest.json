@@ -1,0 +1,11 @@
+{
+    "name": "ResQ Emergency System",
+    "short_name": "ResQ",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#121212",
+    "theme_color": "#D32F2F",
+    "description": "Offline Mesh Communication & SOS Emergency System",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false
+}

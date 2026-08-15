@@ -1,0 +1,57 @@
+name: resq_app
+description: "ResQ - Offline Mesh Communication & SOS Emergency System"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UI & Styling
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  flutter_spinkit: ^5.2.1
+  badges: ^3.1.2
+  
+  # State Management
+  provider: ^6.1.2
+
+  # Networking & REST API
+  dio: ^5.4.3+1
+  connectivity_plus: ^6.0.3
+  socket_io_client: ^2.0.3+1
+  flutter_webrtc: ^1.6.0
+
+  # Database & Preferences
+  sqflite: ^2.3.3+1
+  sqflite_common_ffi: ^2.3.3
+  shared_preferences: ^2.2.3
+  path_provider: ^2.1.3
+  path: ^1.9.0
+
+  # Maps & Location
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  geolocator: ^12.0.0
+
+  # Audio & Vibrations for SOS
+  audioplayers: ^6.0.0
+  vibration: ^3.1.3
+
+  # UUID & Utilities
+  uuid: ^4.4.0
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/sounds/
+    - assets/images/

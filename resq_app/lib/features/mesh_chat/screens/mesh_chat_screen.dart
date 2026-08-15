@@ -1,0 +1,187 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/mesh_chat_provider.dart';
+import 'chat_room_screen.dart';
+import '../../../core/constants/app_colors.dart';
+import '../../calling/call_service.dart';
+
+class MeshChatScreen extends StatelessWidget {
+  const MeshChatScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final chatProvider = Provider.of<MeshChatProvider>(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Offline Mesh Channels'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.sync_rounded),
+            onPressed: () {
+              chatProvider.startMeshNetworking();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Rescanning peer nodes...')),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: AppColors.darkCard,
+            child: Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: const BoxDecoration(
+                    color: AppColors.meshConnected,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Mesh Network Active - ${chatProvider.activePeersCount} Nearby Nodes',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _buildChannelCard(
+                  context,
+                  title: 'Emergency Broadcast Channel',
+                  subtitle: 'Public multi-hop broadcast for all nearby victims and rescue teams',
+                  icon: Icons.cell_tower,
+                  badgeText: '${chatProvider.messages.length} msgs',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChatRoomScreen(
+                          channelName: 'Emergency Broadcast Channel',
+                          receiverId: 'BROADCAST',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildChannelCard(
+                  context,
+                  title: 'Rescue Team Ops',
+                  subtitle: 'Tactical channel for rescue teams, coordinators, and medics',
+                  icon: Icons.shield_outlined,
+                  badgeText: 'Secure',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChatRoomScreen(
+                          channelName: 'Rescue Team Ops',
+                          receiverId: 'RESPONDERS_OPS',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Nearby Devices',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                if (chatProvider.peers.isEmpty)
+                  const Text(
+                    'No live peers discovered yet. Keep Bluetooth, Wi-Fi, and location on.',
+                    style: TextStyle(fontSize: 12, color: Colors.white60),
+                  )
+                else
+                  ...chatProvider.peers.map(
+                    (peer) => Card(
+                      child: ListTile(
+                        leading: Icon(
+                          peer.transport == 'BLE' ? Icons.bluetooth : Icons.wifi,
+                          color: peer.transport == 'BLE' ? AppColors.bleActive : AppColors.wifiDirectActive,
+                        ),
+                        title: Text(peer.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('${peer.transport} - ${peer.id}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              peer.signal.toString(),
+                              style: const TextStyle(fontSize: 12, color: Colors.white60),
+                            ),
+                            IconButton(
+                              tooltip: 'Audio call',
+                              icon: const Icon(Icons.call_rounded, size: 19),
+                              onPressed: () => context.read<CallProvider>().startCall(
+                                recipientId: peer.id,
+                                recipientName: peer.name,
+                                type: CallType.audio,
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Video call',
+                              icon: const Icon(Icons.videocam_rounded, size: 19),
+                              onPressed: () => context.read<CallProvider>().startCall(
+                                recipientId: peer.id,
+                                recipientName: peer.name,
+                                type: CallType.video,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChannelCard(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required String badgeText,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primary.withOpacity(0.15),
+          child: Icon(icon, color: AppColors.primary),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.secondary.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            badgeText,
+            style: const TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.bold),
+          ),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+}

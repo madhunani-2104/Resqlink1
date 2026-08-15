@@ -1,0 +1,8 @@
+.dart_tool/
+.build/
+.pub/
+build/
+.packages
+.pub-cache
+.flutter-plugins
+.flutter-plugins-dependencies
