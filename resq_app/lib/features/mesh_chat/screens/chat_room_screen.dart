@@ -1,12 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/mesh_chat_provider.dart';
 import '../models/chat_message.dart';
+
 import '../../auth/providers/auth_provider.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/voice_recording_service.dart';
 import '../../../core/services/file_access_service.dart';
 import '../../../core/utils/mesh_packet.dart';
+
 import '../../calling/call_service.dart';
 
 class ChatRoomScreen extends StatefulWidget {
@@ -24,117 +30,800 @@ class ChatRoomScreen extends StatefulWidget {
 }
 
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
-  final _messageController = TextEditingController();
+  // ============================================================
+  // CONTROLLERS
+  // ============================================================
 
-  Future<void> _sendFile() async {
-    final picked = await FileAccessService.pickFile();
-    if (!mounted) return;
-    if (picked == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('File selection was cancelled or unavailable.')),
-      );
+  final TextEditingController _messageController = TextEditingController();
+
+  // ============================================================
+  // RECORDING
+  // ============================================================
+
+  Timer? _recordingTimer;
+
+  bool _isRecording = false;
+
+  Duration _recordingDuration = Duration.zero;
+
+  // ============================================================
+  // PLAYBACK
+  // ============================================================
+
+  String? _playingMessageId;
+
+  // ============================================================
+  // FORMAT DURATION
+  // ============================================================
+
+  String _formatDuration(
+    Duration duration,
+  ) {
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+
+    return '$minutes:$seconds';
+  }
+
+  // ============================================================
+  // START RECORDING
+  // ============================================================
+
+  Future<void> _startVoiceRecording() async {
+    if (_isRecording) {
       return;
     }
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final chatProvider = Provider.of<MeshChatProvider>(context, listen: false);
-    final user = authProvider.user;
-    final senderId = user?.id ?? chatProvider.currentUserId;
-    final senderName = user?.name ?? 'Test User';
+    final path = await VoiceRecordingService.startRecording();
 
-    final success = await chatProvider.sendFile(
-      senderId: senderId,
-      senderName: senderName,
-      path: picked.path,
-      receiverId: widget.receiverId,
-      fileName: picked.name,
-      mimeType: picked.mimeType,
-      fileSize: picked.size,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(success ? 'File sent successfully.' : 'File transfer failed.')),
-    );
-  }
+    if (!mounted) {
+      return;
+    }
 
-  void _sendMessage() {
-    final text = _messageController.text.trim();
-    if (text.isEmpty) return;
-
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final chatProvider = Provider.of<MeshChatProvider>(context, listen: false);
-
-    final user = authProvider.user;
-    final senderId = user?.id ?? chatProvider.currentUserId;
-    final senderName = user?.name ?? 'Test User';
-
-    chatProvider.sendMessage(
-      senderId: senderId,
-      senderName: senderName,
-      text: text,
-      receiverId: widget.receiverId,
-    );
-    _messageController.clear();
-  }
-
-  Future<void> _openAttachment(ChatAttachment attachment) async {
-    final chatProvider = Provider.of<MeshChatProvider>(context, listen: false);
-    final path = await chatProvider.downloadFile(attachment.fileId, attachment.fileName, inlineBase64: attachment.inlineBase64);
-
-    if (!mounted) return;
     if (path == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to download this file.')),
+        const SnackBar(
+          content: Text(
+            'Microphone permission is required.',
+          ),
+        ),
       );
+
       return;
     }
 
-    final opened = await FileAccessService.openFile(path, attachment.mimeType);
-    if (!mounted || opened) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('The file was downloaded but could not be opened.')),
+    setState(() {
+      _isRecording = true;
+
+      _recordingDuration = Duration.zero;
+    });
+
+    _recordingTimer?.cancel();
+
+    _recordingTimer = Timer.periodic(
+      const Duration(
+        milliseconds: 200,
+      ),
+      (_) {
+        if (!mounted || !_isRecording) {
+          return;
+        }
+
+        setState(() {
+          _recordingDuration =
+              VoiceRecordingService.getCurrentRecordingDuration();
+        });
+      },
     );
   }
 
-  String _formatFileSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  // ============================================================
+  // STOP RECORDING
+  // ============================================================
+
+  Future<void> _stopVoiceRecording({
+    bool send = true,
+  }) async {
+    if (!_isRecording) {
+      return;
+    }
+
+    _recordingTimer?.cancel();
+
+    _recordingTimer = null;
+
+    final duration = _recordingDuration;
+
+    final path = await VoiceRecordingService.stopRecording();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isRecording = false;
+    });
+
+    // ----------------------------------------------------------
+    // RECORDING FAILED
+    // ----------------------------------------------------------
+
+    if (path == null) {
+      setState(() {
+        _recordingDuration = Duration.zero;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Voice recording failed.',
+          ),
+        ),
+      );
+
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // CANCEL
+    // ----------------------------------------------------------
+
+    if (!send) {
+      setState(() {
+        _recordingDuration = Duration.zero;
+      });
+
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // MINIMUM DURATION
+    // ----------------------------------------------------------
+
+    if (duration.inMilliseconds < 500) {
+      setState(() {
+        _recordingDuration = Duration.zero;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please hold the microphone longer.',
+          ),
+        ),
+      );
+
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // CREATE VOICE PAYLOAD
+    // ----------------------------------------------------------
+
+    final payload = await VoiceRecordingService.createVoiceMessagePayload(
+      path,
+      duration: duration,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (payload == null || payload.isEmpty) {
+      setState(() {
+        _recordingDuration = Duration.zero;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not create voice message.',
+          ),
+        ),
+      );
+
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // PROVIDERS
+    // ----------------------------------------------------------
+
+    final authProvider = Provider.of<AuthProvider>(
+      context,
+      listen: false,
+    );
+
+    final chatProvider = Provider.of<MeshChatProvider>(
+      context,
+      listen: false,
+    );
+
+    final user = authProvider.user;
+
+    final senderId = user?.id ?? chatProvider.currentUserId;
+
+    final senderName = user?.name ?? 'Test User';
+
+    // ----------------------------------------------------------
+    // SEND
+    // ----------------------------------------------------------
+
+    bool success = false;
+
+    try {
+      success = await chatProvider.sendVoiceMessage(
+        senderId: senderId,
+        senderName: senderName,
+        voicePayload: payload,
+        receiverId: widget.receiverId,
+      );
+    } catch (e) {
+      debugPrint(
+        'CHAT VOICE SEND ERROR: $e',
+      );
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _recordingDuration = Duration.zero;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'Voice message sent (${_formatDuration(duration)})'
+              : 'Voice message could not be sent.',
+        ),
+      ),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final chatProvider = Provider.of<MeshChatProvider>(context);
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final currentId = authProvider.user?.id ?? chatProvider.currentUserId;
-    final conversationMessages = chatProvider.messages.where((msg) {
-      if (widget.receiverId == 'BROADCAST' || widget.receiverId == 'RESPONDERS_OPS') {
-        return msg.receiverId == widget.receiverId;
-      }
-      return (msg.senderId == currentId && msg.receiverId == widget.receiverId) ||
-          (msg.senderId == widget.receiverId && msg.receiverId == currentId);
-    }).toList()
-      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+  // ============================================================
+  // SEND TEXT
+  // ============================================================
 
-    final callProvider = Provider.of<CallProvider>(context, listen: false);
+  Future<void> _sendMessage() async {
+    if (_isRecording) {
+      return;
+    }
+
+    final text = _messageController.text.trim();
+
+    if (text.isEmpty) {
+      return;
+    }
+
+    final authProvider = Provider.of<AuthProvider>(
+      context,
+      listen: false,
+    );
+
+    final chatProvider = Provider.of<MeshChatProvider>(
+      context,
+      listen: false,
+    );
+
+    final user = authProvider.user;
+
+    final senderId = user?.id ?? chatProvider.currentUserId;
+
+    final senderName = user?.name ?? 'Test User';
+
+    try {
+      await chatProvider.sendMessage(
+        senderId: senderId,
+        senderName: senderName,
+        text: text,
+        receiverId: widget.receiverId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _messageController.clear();
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Message could not be sent.',
+          ),
+        ),
+      );
+    }
+  }
+
+  // ============================================================
+  // SEND FILE
+  // ============================================================
+
+  Future<void> _sendFile() async {
+    if (_isRecording) {
+      return;
+    }
+
+    final picked = await FileAccessService.pickFile();
+
+    if (!mounted || picked == null) {
+      return;
+    }
+
+    final authProvider = Provider.of<AuthProvider>(
+      context,
+      listen: false,
+    );
+
+    final chatProvider = Provider.of<MeshChatProvider>(
+      context,
+      listen: false,
+    );
+
+    final user = authProvider.user;
+
+    final senderId = user?.id ?? chatProvider.currentUserId;
+
+    final senderName = user?.name ?? 'Test User';
+
+    bool success = false;
+
+    try {
+      success = await chatProvider.sendFile(
+        senderId: senderId,
+        senderName: senderName,
+        path: picked.path,
+        receiverId: widget.receiverId,
+        fileName: picked.name,
+        mimeType: picked.mimeType,
+        fileSize: picked.size,
+      );
+    } catch (e) {
+      debugPrint(
+        'FILE SEND ERROR: $e',
+      );
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success ? 'File sent successfully.' : 'File transfer failed.',
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // PLAY VOICE
+  // ============================================================
+
+  Future<void> _playVoice(
+    String payload,
+    String messageId,
+  ) async {
+    // ----------------------------------------------------------
+    // Stop current playback
+    // ----------------------------------------------------------
+
+    if (_playingMessageId == messageId) {
+      await VoiceRecordingService.stopPlayback();
+
+      if (mounted) {
+        setState(() {
+          _playingMessageId = null;
+        });
+      }
+
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // Stop another voice message
+    // ----------------------------------------------------------
+
+    await VoiceRecordingService.stopPlayback();
+
+    if (mounted) {
+      setState(() {
+        _playingMessageId = null;
+      });
+    }
+
+    // ----------------------------------------------------------
+    // Play
+    // ----------------------------------------------------------
+
+    final success = await VoiceRecordingService.playBase64(
+      payload,
+      playbackId: messageId,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to play voice message.',
+          ),
+        ),
+      );
+
+      return;
+    }
+
+    setState(() {
+      _playingMessageId = messageId;
+    });
+  }
+
+  // ============================================================
+  // VOICE BUBBLE
+  // ============================================================
+
+  Widget _buildVoiceBubble({
+    required ChatVoiceMessage voice,
+    required String messageId,
+  }) {
+    final isPlaying = _playingMessageId == messageId;
+
+    final duration = voice.durationMs > 0 ? voice.formattedDuration : 'Voice';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(
+          0.12,
+        ),
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            onPressed: () => _playVoice(
+              voice.base64Audio,
+              messageId,
+            ),
+            icon: Icon(
+              isPlaying
+                  ? Icons.stop_circle_rounded
+                  : Icons.play_circle_fill_rounded,
+              color: Colors.white,
+              size: 32,
+            ),
+          ),
+          const Icon(
+            Icons.mic_rounded,
+            color: Colors.white70,
+            size: 20,
+          ),
+          const SizedBox(
+            width: 8,
+          ),
+          Text(
+            duration,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // FILE SIZE
+  // ============================================================
+
+  String _formatFileSize(
+    int bytes,
+  ) {
+    if (bytes < 1024) {
+      return '$bytes B';
+    }
+
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  // ============================================================
+  // FILE BUBBLE
+  // ============================================================
+
+  Widget _buildFileBubble(
+    ChatAttachment attachment,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.insert_drive_file_rounded,
+              color: Colors.white,
+            ),
+            const SizedBox(
+              width: 8,
+            ),
+            Flexible(
+              child: Text(
+                attachment.fileName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(
+          height: 5,
+        ),
+        Text(
+          _formatFileSize(
+            attachment.fileSize,
+          ),
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(
+          height: 5,
+        ),
+        OutlinedButton.icon(
+          onPressed: () => _openAttachment(
+            attachment,
+          ),
+          icon: const Icon(
+            Icons.open_in_new,
+            size: 16,
+          ),
+          label: const Text(
+            'Open file',
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // OPEN FILE
+  // ============================================================
+
+  Future<void> _openAttachment(
+    ChatAttachment attachment,
+  ) async {
+    final chatProvider = Provider.of<MeshChatProvider>(
+      context,
+      listen: false,
+    );
+
+    final path = await chatProvider.downloadFile(
+      attachment.fileId,
+      attachment.fileName,
+      inlineBase64: attachment.inlineBase64,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (path == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to download this file.',
+          ),
+        ),
+      );
+
+      return;
+    }
+
+    final opened = await FileAccessService.openFile(
+      path,
+      attachment.mimeType,
+    );
+
+    if (!mounted || opened) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'The file was downloaded but could not be opened.',
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // RECORDING BAR
+  // ============================================================
+
+  Widget _buildRecordingBar() {
+    if (!_isRecording) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 10,
+      ),
+      color: AppColors.primary.withOpacity(
+        0.12,
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.fiber_manual_record,
+            color: AppColors.primary,
+            size: 14,
+          ),
+          const SizedBox(
+            width: 8,
+          ),
+          Expanded(
+            child: Text(
+              'Recording ${_formatDuration(_recordingDuration)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => _stopVoiceRecording(
+              send: false,
+            ),
+            child: const Text(
+              'Cancel',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // MESSAGE FILTER
+  // ============================================================
+
+  List<ChatMessage> _getVisibleMessages(
+    MeshChatProvider chatProvider,
+    String currentId,
+  ) {
+    final messages = chatProvider.messages.where(
+      (msg) {
+        // ------------------------------------------------------
+        // Broadcast channels
+        // ------------------------------------------------------
+
+        if (widget.receiverId == 'BROADCAST' ||
+            widget.receiverId == 'RESPONDERS_OPS') {
+          return msg.receiverId == widget.receiverId;
+        }
+
+        // ------------------------------------------------------
+        // Direct chat
+        // ------------------------------------------------------
+
+        final sentByMe =
+            msg.senderId == currentId && msg.receiverId == widget.receiverId;
+
+        final receivedFromUser =
+            msg.senderId == widget.receiverId && msg.receiverId == currentId;
+
+        return sentByMe || receivedFromUser;
+      },
+    ).toList();
+
+    messages.sort(
+      (a, b) => a.timestamp.compareTo(
+        b.timestamp,
+      ),
+    );
+
+    return messages;
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
+    final chatProvider = Provider.of<MeshChatProvider>(
+      context,
+    );
+
+    final authProvider = Provider.of<AuthProvider>(
+      context,
+      listen: false,
+    );
+
+    final currentId = authProvider.user?.id ?? chatProvider.currentUserId;
+
+    final messages = _getVisibleMessages(
+      chatProvider,
+      currentId,
+    );
+
+    final isBroadcast = widget.receiverId == 'BROADCAST' ||
+        widget.receiverId == 'RESPONDERS_OPS';
+
+    final callProvider = Provider.of<CallProvider>(
+      context,
+      listen: false,
+    );
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.channelName),
-        actions: widget.receiverId == 'BROADCAST' || widget.receiverId == 'RESPONDERS_OPS'
+        title: Text(
+          widget.channelName,
+        ),
+        actions: isBroadcast
             ? null
             : [
+                // ------------------------------------------------
+                // AUDIO CALL
+                // ------------------------------------------------
+
                 IconButton(
-                  tooltip: 'Audio call',
-                  icon: const Icon(Icons.call_rounded),
+                  icon: const Icon(
+                    Icons.call_rounded,
+                  ),
                   onPressed: () => callProvider.startCall(
                     recipientId: widget.receiverId,
                     recipientName: widget.channelName,
                     type: CallType.audio,
                   ),
                 ),
+
+                // ------------------------------------------------
+                // VIDEO CALL
+                // ------------------------------------------------
+
                 IconButton(
-                  tooltip: 'Video call',
-                  icon: const Icon(Icons.videocam_rounded),
+                  icon: const Icon(
+                    Icons.videocam_rounded,
+                  ),
                   onPressed: () => callProvider.startCall(
                     recipientId: widget.receiverId,
                     recipientName: widget.channelName,
@@ -143,159 +832,268 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 ),
               ],
       ),
+
+      // ========================================================
+      // BODY
+      // ========================================================
+
       body: Column(
         children: [
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: conversationMessages.length,
-              itemBuilder: (context, index) {
-                final msg = conversationMessages[index];
-                final isSos = msg.packetType == MeshPacketType.sosBeacon;
-                final isMyMsg = msg.isMe || msg.senderId == currentId;
-                final deliveryStatus = chatProvider.deliveryStatusByPacketId[msg.packetId] ?? 'Queued';
-                final isVoice = msg.content.startsWith('VOICE_MESSAGE_BASE64:');
-                final voicePayload = isVoice ? msg.content.replaceFirst('VOICE_MESSAGE_BASE64:', '') : null;
-                final displayContent = isVoice
-                    ? 'Voice message received'
-                    : msg.content;
+          // ======================================================
+          // MESSAGES
+          // ======================================================
 
-                return Align(
-                  alignment: isMyMsg ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(12),
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.75,
+          Expanded(
+            child: messages.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No messages yet.',
+                      style: TextStyle(
+                        color: Colors.white54,
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      color: isSos
-                          ? AppColors.primary.withOpacity(0.9)
-                          : (isMyMsg ? AppColors.secondary : AppColors.darkCard),
-                      borderRadius: BorderRadius.circular(16),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(
+                      16,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          msg.senderName,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isMyMsg ? Colors.white70 : AppColors.bleActive,
+                    itemCount: messages.length,
+                    itemBuilder: (
+                      context,
+                      index,
+                    ) {
+                      final msg = messages[index];
+
+                      final isMyMsg = msg.isMe || msg.senderId == currentId;
+
+                      final isSos = msg.packetType == MeshPacketType.sosBeacon;
+
+                      final status =
+                          chatProvider.deliveryStatusByPacketId[msg.packetId] ??
+                              'Queued';
+
+                      return Align(
+                        alignment: isMyMsg
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(
+                            bottom: 10,
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        if (msg.attachment != null)
-                          Column(
+                          padding: const EdgeInsets.all(
+                            12,
+                          ),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(
+                                  context,
+                                ).size.width *
+                                0.78,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSos
+                                ? AppColors.primary.withOpacity(
+                                    0.9,
+                                  )
+                                : isMyMsg
+                                    ? AppColors.secondary
+                                    : AppColors.darkCard,
+                            borderRadius: BorderRadius.circular(
+                              16,
+                            ),
+                          ),
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // --------------------------------
+                              // SENDER
+                              // --------------------------------
+
+                              Text(
+                                msg.senderName,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white70,
+                                ),
+                              ),
+
+                              const SizedBox(
+                                height: 5,
+                              ),
+
+                              // --------------------------------
+                              // FILE
+                              // --------------------------------
+
+                              if (msg.attachment != null)
+                                _buildFileBubble(
+                                  msg.attachment!,
+                                )
+
+                              // --------------------------------
+                              // VOICE
+                              // --------------------------------
+
+                              else if (msg.voiceMessage != null)
+                                _buildVoiceBubble(
+                                  voice: msg.voiceMessage!,
+                                  messageId: msg.packetId,
+                                )
+
+                              // --------------------------------
+                              // TEXT
+                              // --------------------------------
+
+                              else
+                                Text(
+                                  msg.content,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                  ),
+                                ),
+
+                              const SizedBox(
+                                height: 5,
+                              ),
+
+                              // --------------------------------
+                              // MESSAGE STATUS
+                              // --------------------------------
+
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.insert_drive_file_rounded, color: Colors.white, size: 20),
-                                  const SizedBox(width: 8),
-                                  Flexible(
-                                    child: Text(
-                                      msg.attachment!.fileName,
-                                      style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w600),
+                                  const Icon(
+                                    Icons.cell_tower,
+                                    size: 11,
+                                    color: Colors.white54,
+                                  ),
+                                  const SizedBox(
+                                    width: 4,
+                                  ),
+                                  Text(
+                                    isMyMsg
+                                        ? '$status • Hops: ${msg.hopCount}'
+                                        : 'Hops: ${msg.hopCount}',
+                                    style: const TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 10,
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _formatFileSize(msg.attachment!.fileSize),
-                                style: const TextStyle(fontSize: 11, color: Colors.white70),
-                              ),
-                              const SizedBox(height: 6),
-                              OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(foregroundColor: Colors.white),
-                                onPressed: () => _openAttachment(msg.attachment!),
-                                icon: const Icon(Icons.open_in_new, size: 16),
-                                label: const Text('Open file'),
-                              ),
                             ],
-                          )
-                        else if (isVoice)
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.16),
-                              foregroundColor: Colors.white,
-                            ),
-                            onPressed: () async {
-                              if (voicePayload != null) {
-                                await VoiceRecordingService.playBase64(voicePayload);
-                              }
-                            },
-                            icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                            label: const Text('Play voice message'),
-                          )
-                        else
-                          Text(
-                            displayContent,
-                            style: const TextStyle(fontSize: 14, color: Colors.white),
                           ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.cell_tower,
-                              size: 11,
-                              color: isMyMsg ? Colors.white60 : Colors.white38,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              isMyMsg ? '$deliveryStatus - Hops: ${msg.hopCount}' : 'Hops: ${msg.hopCount}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: isMyMsg ? Colors.white60 : Colors.white38,
-                              ),
-                            ),
-                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
+
+          // ======================================================
+          // RECORDING BAR
+          // ======================================================
+
+          _buildRecordingBar(),
+
+          // ======================================================
+          // INPUT BAR
+          // ======================================================
+
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(
+              12,
+            ),
             color: AppColors.darkSurface,
             child: Row(
               children: [
+                // =================================================
+                // VOICE
+                // =================================================
+
+                GestureDetector(
+                  onLongPressStart: (_) => _startVoiceRecording(),
+                  onLongPressEnd: (_) => _stopVoiceRecording(),
+                  child: CircleAvatar(
+                    backgroundColor:
+                        _isRecording ? AppColors.primary : AppColors.darkCard,
+                    child: Icon(
+                      _isRecording ? Icons.mic_rounded : Icons.mic_none_rounded,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(
+                  width: 8,
+                ),
+
+                // =================================================
+                // TEXT FIELD
+                // =================================================
+
                 Expanded(
                   child: TextField(
                     controller: _messageController,
+                    enabled: !_isRecording,
+                    textInputAction: TextInputAction.send,
                     decoration: InputDecoration(
-                      hintText: 'Type mesh message...',
+                      hintText: _isRecording
+                          ? 'Recording...'
+                          : 'Type mesh message...',
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(
+                          24,
+                        ),
                         borderSide: BorderSide.none,
                       ),
                       filled: true,
                       fillColor: AppColors.darkCard,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                     ),
+                    onSubmitted: (_) => _sendMessage(),
                   ),
                 ),
-                const SizedBox(width: 8),
+
+                const SizedBox(
+                  width: 8,
+                ),
+
+                // =================================================
+                // FILE
+                // =================================================
+
                 CircleAvatar(
                   backgroundColor: AppColors.darkCard,
                   child: IconButton(
-                    icon: const Icon(Icons.attach_file_rounded, color: Colors.white, size: 20),
-                    onPressed: _sendFile,
+                    icon: const Icon(
+                      Icons.attach_file_rounded,
+                      color: Colors.white,
+                    ),
+                    onPressed: _isRecording ? null : _sendFile,
                   ),
                 ),
-                const SizedBox(width: 8),
+
+                const SizedBox(
+                  width: 8,
+                ),
+
+                // =================================================
+                // SEND
+                // =================================================
+
                 CircleAvatar(
                   backgroundColor: AppColors.primary,
                   child: IconButton(
-                    icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-                    onPressed: _sendMessage,
+                    icon: const Icon(
+                      Icons.send_rounded,
+                      color: Colors.white,
+                    ),
+                    onPressed: _isRecording ? null : _sendMessage,
                   ),
                 ),
               ],
@@ -304,5 +1102,24 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         ],
       ),
     );
+  }
+
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
+  @override
+  void dispose() {
+    _recordingTimer?.cancel();
+
+    if (_isRecording) {
+      VoiceRecordingService.stopRecording();
+    }
+
+    _messageController.dispose();
+
+    VoiceRecordingService.stopPlayback();
+
+    super.dispose();
   }
 }

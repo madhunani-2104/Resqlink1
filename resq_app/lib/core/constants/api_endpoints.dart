@@ -1,23 +1,32 @@
 class ApiEndpoints {
   // ============================================================
-  // BACKEND BASE URL
+  // BACKEND
   // ============================================================
-  //
-  // Your PC's current Wi-Fi IPv4 address:
+
+  // PC IP:
   // 192.168.0.128
   //
   // Backend:
   // http://192.168.0.128:5000
   //
-  // IMPORTANT:
-  // Keep the backend running with:
-  // npm start
+  // API:
+  // http://192.168.0.128:5000/api
   //
+  // IMPORTANT:
+  // Phone and PC must be connected to the same Wi-Fi.
+  //
+  // Backend should listen on:
+  // 0.0.0.0:5000
+  //
+  // NOT only:
+  // localhost:5000
+
   static const String baseUrl = 'http://192.168.0.128:5000/api';
+
   static const String webBaseUrl = 'http://192.168.0.128:5000/api';
 
   // ============================================================
-  // AUTH ENDPOINTS
+  // AUTH
   // ============================================================
 
   static const String login = '/auth/login';
@@ -35,7 +44,7 @@ class ApiEndpoints {
   static const String me = '/auth/me';
 
   // ============================================================
-  // USER PROFILE
+  // USER
   // ============================================================
 
   static const String updateProfile = '/user/profile';
@@ -47,7 +56,7 @@ class ApiEndpoints {
   static const String leaderboard = '/user/leaderboard';
 
   // ============================================================
-  // SOS EMERGENCY
+  // SOS
   // ============================================================
 
   static const String sos = '/sos';
@@ -62,8 +71,12 @@ class ApiEndpoints {
     return '/sos/$id/resolve';
   }
 
+  static String cancelSos(String id) {
+    return '/sos/$id/cancel';
+  }
+
   // ============================================================
-  // MESH & SYNC
+  // MESH
   // ============================================================
 
   static const String meshMessage = '/mesh/message';
@@ -79,7 +92,7 @@ class ApiEndpoints {
   }
 
   // ============================================================
-  // MAP & GIS
+  // MAP
   // ============================================================
 
   static const String mapLayers = '/map/layers';

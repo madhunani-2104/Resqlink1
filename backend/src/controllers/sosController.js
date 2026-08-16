@@ -5,14 +5,24 @@ const { predictEmergencyRisk } = require('../utils/riskPredictor');
 
 const findSosAlertByParam = async (idOrSosId) => {
   const query = idOrSosId.match(/^[0-9a-fA-F]{24}$/)
-    ? { $or: [{ _id: idOrSosId }, { sosId: idOrSosId }] }
-    : { sosId: idOrSosId };
+    ? {
+        $or: [
+          { _id: idOrSosId },
+          { sosId: idOrSosId },
+        ],
+      }
+    : {
+        sosId: idOrSosId,
+      };
+
   return SosAlert.findOne(query);
 };
 
-// @desc    Trigger/Create new SOS Alert
-// @route   POST /api/sos
-// @access  Private
+// ============================================================
+// CREATE SOS
+// POST /api/sos
+// ============================================================
+
 const createSosAlert = async (req, res, next) => {
   try {
     const {
@@ -31,59 +41,123 @@ const createSosAlert = async (req, res, next) => {
     } = req.body;
 
     const user = await User.findById(req.user._id);
+
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    const hasValidCoordinate = (value, min, max) =>
-      typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
-
-    if (!hasValidCoordinate(latitude, -90, 90) || !hasValidCoordinate(longitude, -180, 180)) {
-      return res.status(400).json({
+      return res.status(404).json({
         success: false,
-        message: 'A valid current GPS latitude and longitude are required for SOS.',
+        message: 'User not found',
       });
     }
 
-    const normalizedAltitude = typeof altitude === 'number' && Number.isFinite(altitude) ? altitude : 0;
-    const normalizedAccuracy = typeof accuracy === 'number' && Number.isFinite(accuracy) && accuracy >= 0
-      ? accuracy
-      : 0;
+    // ----------------------------------------------------------
+    // Validate GPS
+    // ----------------------------------------------------------
 
-    const generatedSosId = sosId || `SOS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const hasValidCoordinate = (
+      value,
+      min,
+      max,
+    ) =>
+      typeof value === 'number' &&
+      Number.isFinite(value) &&
+      value >= min &&
+      value <= max;
 
-    // The client may retry after an intermittent connection failure. Reuse the
-    // existing SOS record instead of creating a duplicate emergency event.
-    const existingAlert = await SosAlert.findOne({ sosId: generatedSosId });
-    if (existingAlert) {
-      return res.status(200).json({ success: true, data: existingAlert, duplicate: true });
+    if (
+      !hasValidCoordinate(latitude, -90, 90) ||
+      !hasValidCoordinate(longitude, -180, 180)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'A valid current GPS latitude and longitude are required for SOS.',
+      });
     }
 
-    // Run the local deterministic risk heuristic on the server. No external AI
-    // service or internet connection is required for this calculation.
-    const riskPrediction = predictEmergencyRisk({
-      severity: severity || 'CRITICAL',
-      riskLevel: riskPrediction.riskLevel,
-      riskScore: riskPrediction.riskScore,
-      riskReason: riskPrediction.riskReason,
-      riskPredictedAt: riskPrediction.predictedAt,
-      notes: notes || '',
-      latitude,
-      longitude,
-      accuracy: normalizedAccuracy,
-    });
+    // ----------------------------------------------------------
+    // Normalize values
+    // ----------------------------------------------------------
+
+    const normalizedAltitude =
+      typeof altitude === 'number' &&
+      Number.isFinite(altitude)
+        ? altitude
+        : 0;
+
+    const normalizedAccuracy =
+      typeof accuracy === 'number' &&
+      Number.isFinite(accuracy) &&
+      accuracy >= 0
+        ? accuracy
+        : 0;
+
+    const generatedSosId =
+      sosId ||
+      `SOS-${Date.now()}-${Math.floor(
+        Math.random() * 1000,
+      )}`;
+
+    // ----------------------------------------------------------
+    // Prevent duplicate SOS
+    // ----------------------------------------------------------
+
+    const existingAlert =
+      await SosAlert.findOne({
+        sosId: generatedSosId,
+      });
+
+    if (existingAlert) {
+      return res.status(200).json({
+        success: true,
+        data: existingAlert,
+        duplicate: true,
+      });
+    }
+
+    // ----------------------------------------------------------
+    // Risk prediction
+    // ----------------------------------------------------------
+
+    const riskPrediction =
+      predictEmergencyRisk({
+        severity: severity || 'CRITICAL',
+        notes: notes || '',
+        latitude,
+        longitude,
+        accuracy: normalizedAccuracy,
+      });
+
+    // ----------------------------------------------------------
+    // Create SOS
+    // ----------------------------------------------------------
 
     const sosAlert = await SosAlert.create({
       sosId: generatedSosId,
+
       userId: user._id,
+
       userName: user.name,
+
       userPhone: user.phone,
+
       medicalInfoSummary: {
-        bloodGroup: user.medicalInfo?.bloodGroup || 'Unknown',
-        allergies: user.medicalInfo?.allergies || [],
-        chronicConditions: user.medicalInfo?.chronicConditions || [],
-        notes: user.medicalInfo?.notes || '',
+        bloodGroup:
+          user.medicalInfo?.bloodGroup ||
+          'Unknown',
+
+        allergies:
+          user.medicalInfo?.allergies ||
+          [],
+
+        chronicConditions:
+          user.medicalInfo?.chronicConditions ||
+          [],
+
+        notes:
+          user.medicalInfo?.notes ||
+          '',
       },
+
       location: {
         latitude,
         longitude,
@@ -91,51 +165,114 @@ const createSosAlert = async (req, res, next) => {
         accuracy: normalizedAccuracy,
         address: address || '',
       },
-      batteryLevel: batteryLevel || 100,
-      severity: severity || 'CRITICAL',
-      riskLevel: riskPrediction.riskLevel,
-      riskScore: riskPrediction.riskScore,
-      riskReason: riskPrediction.riskReason,
-      riskPredictedAt: riskPrediction.predictedAt,
-      notes: notes || '',
-      isMeshRelayed: isMeshRelayed || false,
-      relayHops: relayHops || 0,
-      meshRelayNodes: meshRelayNodes || [],
+
+      batteryLevel:
+        typeof batteryLevel === 'number'
+          ? batteryLevel
+          : 100,
+
+      severity:
+        severity || 'CRITICAL',
+
+      riskLevel:
+        riskPrediction.riskLevel,
+
+      riskScore:
+        riskPrediction.riskScore,
+
+      riskReason:
+        riskPrediction.reason,
+
+      riskPredictedAt:
+        riskPrediction.predictedAt,
+
+      notes:
+        notes || '',
+
+      isMeshRelayed:
+        Boolean(isMeshRelayed),
+
+      relayHops:
+        relayHops || 0,
+
+      meshRelayNodes:
+        meshRelayNodes || [],
     });
 
+    // ----------------------------------------------------------
     // Update user location
-    if (hasValidCoordinate(latitude, -90, 90) && hasValidCoordinate(longitude, -180, 180)) {
-      user.lastLocation = { latitude, longitude, updatedAt: new Date() };
-      await user.save();
-    }
+    // ----------------------------------------------------------
 
-    // Emit the emergency event through the existing Socket.IO infrastructure.
-    // Rescue/admin users receive every active SOS; registered emergency contacts
-    // receive only the SOS addressed to them. Non-app contacts continue to use
-    // the existing device SMS notification service on the client.
+    user.lastLocation = {
+      latitude,
+      longitude,
+      updatedAt: new Date(),
+    };
+
+    await user.save();
+
+    // ----------------------------------------------------------
+    // Socket.IO
+    // ----------------------------------------------------------
+
     const io = req.app.get('socketio');
-    if (io) {
-      io.to('rescue_team').emit('new_sos_alert', sosAlert);
-      io.to('admin').emit('new_sos_alert', sosAlert);
 
-      const contactPhones = (user.emergencyContacts || [])
-        .map((contact) => contact.phone)
-        .filter(Boolean);
+    if (io) {
+      // Rescue teams
+      io.to('rescue_team').emit(
+        'new_sos_alert',
+        sosAlert,
+      );
+
+      // Admin
+      io.to('admin').emit(
+        'new_sos_alert',
+        sosAlert,
+      );
+
+      // --------------------------------------------------------
+      // Emergency contacts who also have ResQ accounts
+      // --------------------------------------------------------
+
+      const contactPhones =
+        (user.emergencyContacts || [])
+          .map(
+            (contact) => contact.phone,
+          )
+          .filter(Boolean);
 
       if (contactPhones.length > 0) {
-        const contactUsers = await User.find({
-          phone: { $in: contactPhones },
-          _id: { $ne: user._id },
-          isActive: true,
-        }).select('_id');
+        const contactUsers =
+          await User.find({
+            phone: {
+              $in: contactPhones,
+            },
 
-        for (const contactUser of contactUsers) {
-          io.to(`user:${contactUser._id.toString()}`).emit('sos_emergency_alert', sosAlert);
+            _id: {
+              $ne: user._id,
+            },
+
+            isActive: true,
+          }).select('_id');
+
+        for (
+          const contactUser of contactUsers
+        ) {
+          io.to(
+            `user:${contactUser._id.toString()}`,
+          ).emit(
+            'sos_emergency_alert',
+            sosAlert,
+          );
         }
       }
     }
 
-    res.status(201).json({
+    // ----------------------------------------------------------
+    // Response
+    // ----------------------------------------------------------
+
+    return res.status(201).json({
       success: true,
       data: sosAlert,
     });
@@ -144,16 +281,36 @@ const createSosAlert = async (req, res, next) => {
   }
 };
 
-// @desc    Get all active SOS alerts
-// @route   GET /api/sos/active
-// @access  Private (Responder/Admin/User)
-const getActiveSosAlerts = async (req, res, next) => {
-  try {
-    const alerts = await SosAlert.find({ status: { $in: ['ACTIVE', 'ACKNOWLEDGED'] } })
-      .sort({ riskScore: -1, createdAt: -1 })
-      .populate('userId', 'name phone medicalInfo');
+// ============================================================
+// GET ACTIVE SOS
+// GET /api/sos/active
+// ============================================================
 
-    res.json({
+const getActiveSosAlerts = async (
+  req,
+  res,
+  next,
+) => {
+  try {
+    const alerts =
+      await SosAlert.find({
+        status: {
+          $in: [
+            'ACTIVE',
+            'ACKNOWLEDGED',
+          ],
+        },
+      })
+        .sort({
+          riskScore: -1,
+          createdAt: -1,
+        })
+        .populate(
+          'userId',
+          'name phone medicalInfo',
+        );
+
+    return res.json({
       success: true,
       count: alerts.length,
       data: alerts,
@@ -163,64 +320,147 @@ const getActiveSosAlerts = async (req, res, next) => {
   }
 };
 
-// @desc    Acknowledge SOS Alert (by Responder/Admin)
-// @route   PUT /api/sos/:id/acknowledge
-// @access  Private (Responder/Admin)
-const acknowledgeSosAlert = async (req, res, next) => {
+// ============================================================
+// ACKNOWLEDGE SOS
+// PUT /api/sos/:id/acknowledge
+// ============================================================
+
+const acknowledgeSosAlert = async (
+  req,
+  res,
+  next,
+) => {
   try {
-    const alert = await findSosAlertByParam(req.params.id);
+    const alert =
+      await findSosAlertByParam(
+        req.params.id,
+      );
+
     if (!alert) {
-      return res.status(404).json({ success: false, message: 'SOS Alert not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'SOS Alert not found',
+      });
     }
 
     alert.status = 'ACKNOWLEDGED';
-    alert.respondedBy = req.user._id;
-    alert.acknowledgedAt = new Date();
+
+    alert.respondedBy =
+      req.user._id;
+
+    alert.acknowledgedAt =
+      new Date();
+
     await alert.save();
 
-    const io = req.app.get('socketio');
+    const io =
+      req.app.get('socketio');
+
     if (io) {
-      io.to('rescue_team').emit('sos_status_updated', alert);
-      io.to('admin').emit('sos_status_updated', alert);
+      io.to('rescue_team').emit(
+        'sos_status_updated',
+        alert,
+      );
+
+      io.to('admin').emit(
+        'sos_status_updated',
+        alert,
+      );
     }
 
-    res.json({ success: true, data: alert });
+    return res.json({
+      success: true,
+      data: alert,
+    });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Resolve/Mark Rescued SOS Alert
-// @route   PUT /api/sos/:id/resolve
-// @access  Private (Responder/Admin/Owner)
-const resolveSosAlert = async (req, res, next) => {
+// ============================================================
+// RESOLVE SOS
+// PUT /api/sos/:id/resolve
+// ============================================================
+
+const resolveSosAlert = async (
+  req,
+  res,
+  next,
+) => {
   try {
-    const alert = await findSosAlertByParam(req.params.id);
+    const alert =
+      await findSosAlertByParam(
+        req.params.id,
+      );
+
     if (!alert) {
-      return res.status(404).json({ success: false, message: 'SOS Alert not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'SOS Alert not found',
+      });
     }
 
-    // The existing responder workflow is the authoritative help/rescue action.
-    // If nobody acknowledged first, the authenticated resolver becomes the helper.
+    // ----------------------------------------------------------
+    // Assign helper if nobody acknowledged yet
+    // ----------------------------------------------------------
+
     if (!alert.respondedBy) {
-      alert.respondedBy = req.user._id;
-      alert.acknowledgedAt = alert.acknowledgedAt || new Date();
+      alert.respondedBy =
+        req.user._id;
+
+      alert.acknowledgedAt =
+        alert.acknowledgedAt ||
+        new Date();
     }
 
-    const helperId = alert.respondedBy;
-    if (helperId.toString() === alert.userId.toString()) {
-      return res.status(403).json({ success: false, message: 'A user cannot receive rescue points for their own SOS' });
+    const helperId =
+      alert.respondedBy;
+
+    // ----------------------------------------------------------
+    // Prevent self reward
+    // ----------------------------------------------------------
+
+    if (
+      helperId.toString() ===
+      alert.userId.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          'A user cannot receive rescue points for their own SOS',
+      });
     }
 
-    const wasAlreadyRescued = alert.status === 'RESCUED';
+    const wasAlreadyRescued =
+      alert.status === 'RESCUED';
+
     alert.status = 'RESCUED';
-    alert.resolvedAt = alert.resolvedAt || new Date();
+
+    alert.resolvedAt =
+      alert.resolvedAt ||
+      new Date();
+
     await alert.save();
 
-    // Reward creation is idempotent through the unique (SOS, helper) index.
-    // The point value is configurable centrally and is never supplied by the client.
-    const configuredPoints = Number.parseInt(process.env.RESCUE_HELP_POINTS || '10', 10);
-    const rewardPoints = Number.isFinite(configuredPoints) && configuredPoints > 0 ? configuredPoints : 10;
+    // ----------------------------------------------------------
+    // Reward
+    // ----------------------------------------------------------
+
+    const configuredPoints =
+      Number.parseInt(
+        process.env.RESCUE_HELP_POINTS ||
+          '10',
+        10,
+      );
+
+    const rewardPoints =
+      Number.isFinite(
+        configuredPoints,
+      ) &&
+      configuredPoints > 0
+        ? configuredPoints
+        : 10;
+
     let rewardCreated = false;
 
     if (!wasAlreadyRescued) {
@@ -230,40 +470,105 @@ const resolveSosAlert = async (req, res, next) => {
           helperId,
           points: rewardPoints,
         });
-        await User.findByIdAndUpdate(helperId, {
-          $inc: { helpPoints: rewardPoints, rescuesCompleted: 1 },
-        });
+
+        await User.findByIdAndUpdate(
+          helperId,
+          {
+            $inc: {
+              helpPoints:
+                rewardPoints,
+
+              rescuesCompleted: 1,
+            },
+          },
+        );
+
         rewardCreated = true;
       } catch (rewardError) {
-        // Duplicate reward requests are expected during retries/reconnects.
-        if (rewardError?.code !== 11000) throw rewardError;
+        if (
+          rewardError?.code !==
+          11000
+        ) {
+          throw rewardError;
+        }
       }
     }
 
-    const helper = await User.findById(helperId).select('_id name helpPoints rescuesCompleted');
-    const io = req.app.get('socketio');
+    // ----------------------------------------------------------
+    // Get helper
+    // ----------------------------------------------------------
+
+    const helper =
+      await User.findById(
+        helperId,
+      ).select(
+        '_id name helpPoints rescuesCompleted',
+      );
+
+    // ----------------------------------------------------------
+    // Socket update
+    // ----------------------------------------------------------
+
+    const io =
+      req.app.get('socketio');
+
     if (io) {
-      io.to('rescue_team').emit('sos_status_updated', alert);
-      io.to('admin').emit('sos_status_updated', alert);
-      io.to(`user:${helperId.toString()}`).emit('leaderboard_updated', {
-        userId: helperId,
-        helpPoints: helper?.helpPoints || 0,
-        rescuesCompleted: helper?.rescuesCompleted || 0,
-        rewardCreated,
-        pointsAwarded: rewardCreated ? rewardPoints : 0,
-        sosId: alert.sosId,
-      });
+      io.to('rescue_team').emit(
+        'sos_status_updated',
+        alert,
+      );
+
+      io.to('admin').emit(
+        'sos_status_updated',
+        alert,
+      );
+
+      io.to(
+        `user:${helperId.toString()}`,
+      ).emit(
+        'leaderboard_updated',
+        {
+          userId: helperId,
+
+          helpPoints:
+            helper?.helpPoints || 0,
+
+          rescuesCompleted:
+            helper?.rescuesCompleted ||
+            0,
+
+          rewardCreated,
+
+          pointsAwarded:
+            rewardCreated
+              ? rewardPoints
+              : 0,
+
+          sosId: alert.sosId,
+        },
+      );
     }
 
-    res.json({
+    return res.json({
       success: true,
+
       data: alert,
+
       reward: {
         awarded: rewardCreated,
-        points: rewardCreated ? rewardPoints : 0,
+
+        points:
+          rewardCreated
+            ? rewardPoints
+            : 0,
+
         helperId,
-        helpPoints: helper?.helpPoints || 0,
-        rescuesCompleted: helper?.rescuesCompleted || 0,
+
+        helpPoints:
+          helper?.helpPoints || 0,
+
+        rescuesCompleted:
+          helper?.rescuesCompleted || 0,
       },
     });
   } catch (error) {
@@ -271,31 +576,75 @@ const resolveSosAlert = async (req, res, next) => {
   }
 };
 
-// @desc    Cancel SOS Alert (by Owner)
-// @route   PUT /api/sos/:id/cancel
-// @access  Private
-const cancelSosAlert = async (req, res, next) => {
+// ============================================================
+// CANCEL SOS
+// PUT /api/sos/:id/cancel
+// ============================================================
+
+const cancelSosAlert = async (
+  req,
+  res,
+  next,
+) => {
   try {
-    const alert = await findSosAlertByParam(req.params.id);
+    const alert =
+      await findSosAlertByParam(
+        req.params.id,
+      );
+
     if (!alert) {
-      return res.status(404).json({ success: false, message: 'SOS Alert not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'SOS Alert not found',
+      });
     }
 
-    if (alert.userId.toString() !== req.user._id.toString() && req.user.role === 'user') {
-      return res.status(403).json({ success: false, message: 'Not authorized to cancel this alert' });
+    // ----------------------------------------------------------
+    // User can cancel only their own SOS
+    // ----------------------------------------------------------
+
+    if (
+      alert.userId.toString() !==
+        req.user._id.toString() &&
+      req.user.role === 'user'
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          'Not authorized to cancel this alert',
+      });
     }
 
     alert.status = 'CANCELLED';
-    alert.resolvedAt = new Date();
+
+    alert.resolvedAt =
+      new Date();
+
     await alert.save();
 
-    const io = req.app.get('socketio');
+    // ----------------------------------------------------------
+    // Socket update
+    // ----------------------------------------------------------
+
+    const io =
+      req.app.get('socketio');
+
     if (io) {
-      io.to('rescue_team').emit('sos_status_updated', alert);
-      io.to('admin').emit('sos_status_updated', alert);
+      io.to('rescue_team').emit(
+        'sos_status_updated',
+        alert,
+      );
+
+      io.to('admin').emit(
+        'sos_status_updated',
+        alert,
+      );
     }
 
-    res.json({ success: true, data: alert });
+    return res.json({
+      success: true,
+      data: alert,
+    });
   } catch (error) {
     next(error);
   }

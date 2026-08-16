@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
+
 import '../../../core/constants/app_colors.dart';
 
 class SosButton extends StatefulWidget {
   final VoidCallback onTrigger;
   final bool isActive;
 
-  const SosButton({
-    Key? key,
-    required this.onTrigger,
-    this.isActive = false,
-  }) : super(key: key);
+  const SosButton({Key? key, required this.onTrigger, this.isActive = false})
+    : super(key: key);
 
   @override
   State<SosButton> createState() => _SosButtonState();
 }
 
-class _SosButtonState extends State<SosButton> with SingleTickerProviderStateMixin {
+class _SosButtonState extends State<SosButton>
+    with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
+
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -66,13 +66,16 @@ class _SosButtonState extends State<SosButton> with SingleTickerProviderStateMix
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                widget.isActive ? Icons.warning_amber_rounded : Icons.sos_rounded,
+                widget.isActive
+                    ? Icons.warning_amber_rounded
+                    : Icons.sos_rounded,
                 size: 72,
                 color: Colors.white,
               ),
               const SizedBox(height: 8),
               Text(
                 widget.isActive ? 'SOS BROADCASTING' : 'PRESS FOR SOS',
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
