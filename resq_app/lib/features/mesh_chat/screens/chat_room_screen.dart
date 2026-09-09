@@ -56,9 +56,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // FORMAT DURATION
   // ============================================================
 
-  String _formatDuration(
-    Duration duration,
-  ) {
+  String _formatDuration(Duration duration) {
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
 
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
@@ -71,23 +69,28 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // ============================================================
 
   Future<void> _startVoiceRecording() async {
+    debugPrint('CHAT MIC: _startVoiceRecording CALLED');
+
     if (_isRecording) {
+      debugPrint('CHAT MIC: Already recording');
       return;
     }
 
+    debugPrint('CHAT MIC: Calling VoiceRecordingService.startRecording()');
+
     final path = await VoiceRecordingService.startRecording();
+
+    debugPrint('CHAT MIC: Recording path = $path');
 
     if (!mounted) {
       return;
     }
 
     if (path == null) {
+      debugPrint('CHAT MIC: RECORDING FAILED - no path returned');
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Microphone permission is required.',
-          ),
-        ),
+        const SnackBar(content: Text('Microphone permission is required.')),
       );
 
       return;
@@ -95,47 +98,50 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     setState(() {
       _isRecording = true;
-
       _recordingDuration = Duration.zero;
     });
 
+    debugPrint('CHAT MIC: RECORDING STARTED');
+
     _recordingTimer?.cancel();
 
-    _recordingTimer = Timer.periodic(
-      const Duration(
-        milliseconds: 200,
-      ),
-      (_) {
-        if (!mounted || !_isRecording) {
-          return;
-        }
+    _recordingTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      if (!mounted || !_isRecording) {
+        return;
+      }
 
-        setState(() {
-          _recordingDuration =
-              VoiceRecordingService.getCurrentRecordingDuration();
-        });
-      },
-    );
+      setState(() {
+        _recordingDuration =
+            VoiceRecordingService.getCurrentRecordingDuration();
+      });
+    });
   }
 
   // ============================================================
   // STOP RECORDING
   // ============================================================
 
-  Future<void> _stopVoiceRecording({
-    bool send = true,
-  }) async {
+  Future<void> _stopVoiceRecording({bool send = true}) async {
+    debugPrint('CHAT MIC: _stopVoiceRecording CALLED - send=$send');
+
     if (!_isRecording) {
+      debugPrint('CHAT MIC: Not currently recording');
       return;
     }
 
     _recordingTimer?.cancel();
-
     _recordingTimer = null;
 
     final duration = _recordingDuration;
 
+    debugPrint(
+      'CHAT MIC: Stopping after '
+      '${duration.inMilliseconds}ms',
+    );
+
     final path = await VoiceRecordingService.stopRecording();
+
+    debugPrint('CHAT MIC: Recording stopped. path=$path');
 
     if (!mounted) {
       return;
@@ -150,17 +156,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     // ----------------------------------------------------------
 
     if (path == null) {
+      debugPrint('CHAT MIC: STOP FAILED');
+
       setState(() {
         _recordingDuration = Duration.zero;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Voice recording failed.',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Voice recording failed.')));
 
       return;
     }
@@ -170,6 +174,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     // ----------------------------------------------------------
 
     if (!send) {
+      debugPrint('CHAT MIC: Recording cancelled');
+
       setState(() {
         _recordingDuration = Duration.zero;
       });
@@ -182,16 +188,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     // ----------------------------------------------------------
 
     if (duration.inMilliseconds < 500) {
+      debugPrint(
+        'CHAT MIC: Recording too short: '
+        '${duration.inMilliseconds}ms',
+      );
+
       setState(() {
         _recordingDuration = Duration.zero;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please hold the microphone longer.',
-          ),
-        ),
+        const SnackBar(content: Text('Please hold the microphone longer.')),
       );
 
       return;
@@ -200,6 +207,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     // ----------------------------------------------------------
     // CREATE VOICE PAYLOAD
     // ----------------------------------------------------------
+
+    debugPrint('CHAT MIC: Creating voice payload');
 
     final payload = await VoiceRecordingService.createVoiceMessagePayload(
       path,
@@ -211,34 +220,28 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
 
     if (payload == null || payload.isEmpty) {
+      debugPrint('CHAT MIC: PAYLOAD CREATION FAILED');
+
       setState(() {
         _recordingDuration = Duration.zero;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Could not create voice message.',
-          ),
-        ),
+        const SnackBar(content: Text('Could not create voice message.')),
       );
 
       return;
     }
 
+    debugPrint('CHAT MIC: Voice payload created');
+
     // ----------------------------------------------------------
     // PROVIDERS
     // ----------------------------------------------------------
 
-    final authProvider = Provider.of<AuthProvider>(
-      context,
-      listen: false,
-    );
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    final chatProvider = Provider.of<MeshChatProvider>(
-      context,
-      listen: false,
-    );
+    final chatProvider = Provider.of<MeshChatProvider>(context, listen: false);
 
     final user = authProvider.user;
 
@@ -253,16 +256,20 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     bool success = false;
 
     try {
+      debugPrint('CHAT MIC: Sending voice message');
+
+      debugPrint('CHAT MIC: receiverId=${widget.receiverId}');
+
       success = await chatProvider.sendVoiceMessage(
         senderId: senderId,
         senderName: senderName,
         voicePayload: payload,
         receiverId: widget.receiverId,
       );
+
+      debugPrint('CHAT MIC: SEND RESULT = $success');
     } catch (e) {
-      debugPrint(
-        'CHAT VOICE SEND ERROR: $e',
-      );
+      debugPrint('CHAT VOICE SEND ERROR: $e');
     }
 
     if (!mounted) {
@@ -277,7 +284,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       SnackBar(
         content: Text(
           success
-              ? 'Voice message sent (${_formatDuration(duration)})'
+              ? 'Voice message sent '
+                    '(${_formatDuration(duration)})'
               : 'Voice message could not be sent.',
         ),
       ),
@@ -299,15 +307,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       return;
     }
 
-    final authProvider = Provider.of<AuthProvider>(
-      context,
-      listen: false,
-    );
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    final chatProvider = Provider.of<MeshChatProvider>(
-      context,
-      listen: false,
-    );
+    final chatProvider = Provider.of<MeshChatProvider>(context, listen: false);
 
     final user = authProvider.user;
 
@@ -329,16 +331,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
       _messageController.clear();
     } catch (e) {
+      debugPrint('CHAT TEXT SEND ERROR: $e');
+
       if (!mounted) {
         return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Message could not be sent.',
-          ),
-        ),
+        const SnackBar(content: Text('Message could not be sent.')),
       );
     }
   }
@@ -358,15 +358,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       return;
     }
 
-    final authProvider = Provider.of<AuthProvider>(
-      context,
-      listen: false,
-    );
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    final chatProvider = Provider.of<MeshChatProvider>(
-      context,
-      listen: false,
-    );
+    final chatProvider = Provider.of<MeshChatProvider>(context, listen: false);
 
     final user = authProvider.user;
 
@@ -387,9 +381,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         fileSize: picked.size,
       );
     } catch (e) {
-      debugPrint(
-        'FILE SEND ERROR: $e',
-      );
+      debugPrint('FILE SEND ERROR: $e');
     }
 
     if (!mounted) {
@@ -409,14 +401,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // PLAY VOICE
   // ============================================================
 
-  Future<void> _playVoice(
-    String payload,
-    String messageId,
-  ) async {
-    // ----------------------------------------------------------
-    // Stop current playback
-    // ----------------------------------------------------------
-
+  Future<void> _playVoice(String payload, String messageId) async {
     if (_playingMessageId == messageId) {
       await VoiceRecordingService.stopPlayback();
 
@@ -429,10 +414,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       return;
     }
 
-    // ----------------------------------------------------------
-    // Stop another voice message
-    // ----------------------------------------------------------
-
     await VoiceRecordingService.stopPlayback();
 
     if (mounted) {
@@ -440,10 +421,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         _playingMessageId = null;
       });
     }
-
-    // ----------------------------------------------------------
-    // Play
-    // ----------------------------------------------------------
 
     final success = await VoiceRecordingService.playBase64(
       payload,
@@ -456,11 +433,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to play voice message.',
-          ),
-        ),
+        const SnackBar(content: Text('Unable to play voice message.')),
       );
 
       return;
@@ -484,26 +457,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final duration = voice.durationMs > 0 ? voice.formattedDuration : 'Voice';
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 8,
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(
-          0.12,
-        ),
-        borderRadius: BorderRadius.circular(
-          14,
-        ),
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            onPressed: () => _playVoice(
-              voice.base64Audio,
-              messageId,
-            ),
+            onPressed: () => _playVoice(voice.base64Audio, messageId),
             icon: Icon(
               isPlaying
                   ? Icons.stop_circle_rounded
@@ -512,14 +475,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               size: 32,
             ),
           ),
-          const Icon(
-            Icons.mic_rounded,
-            color: Colors.white70,
-            size: 20,
-          ),
-          const SizedBox(
-            width: 8,
-          ),
+          const Icon(Icons.mic_rounded, color: Colors.white70, size: 20),
+          const SizedBox(width: 8),
           Text(
             duration,
             style: const TextStyle(
@@ -536,9 +493,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // FILE SIZE
   // ============================================================
 
-  String _formatFileSize(
-    int bytes,
-  ) {
+  String _formatFileSize(int bytes) {
     if (bytes < 1024) {
       return '$bytes B';
     }
@@ -558,22 +513,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // FILE BUBBLE
   // ============================================================
 
-  Widget _buildFileBubble(
-    ChatAttachment attachment,
-  ) {
+  Widget _buildFileBubble(ChatAttachment attachment) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.insert_drive_file_rounded,
-              color: Colors.white,
-            ),
-            const SizedBox(
-              width: 8,
-            ),
+            const Icon(Icons.insert_drive_file_rounded, color: Colors.white),
+            const SizedBox(width: 8),
             Flexible(
               child: Text(
                 attachment.fileName,
@@ -585,35 +533,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
           ],
         ),
-        const SizedBox(
-          height: 5,
-        ),
+        const SizedBox(height: 5),
         Text(
-          _formatFileSize(
-            attachment.fileSize,
-          ),
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 11,
-          ),
+          _formatFileSize(attachment.fileSize),
+          style: const TextStyle(color: Colors.white70, fontSize: 11),
         ),
-        const SizedBox(
-          height: 5,
-        ),
+        const SizedBox(height: 5),
         OutlinedButton.icon(
-          onPressed: () => _openAttachment(
-            attachment,
-          ),
-          icon: const Icon(
-            Icons.open_in_new,
-            size: 16,
-          ),
-          label: const Text(
-            'Open file',
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.white,
-          ),
+          onPressed: () => _openAttachment(attachment),
+          icon: const Icon(Icons.open_in_new, size: 16),
+          label: const Text('Open file'),
+          style: OutlinedButton.styleFrom(foregroundColor: Colors.white),
         ),
       ],
     );
@@ -623,13 +553,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // OPEN FILE
   // ============================================================
 
-  Future<void> _openAttachment(
-    ChatAttachment attachment,
-  ) async {
-    final chatProvider = Provider.of<MeshChatProvider>(
-      context,
-      listen: false,
-    );
+  Future<void> _openAttachment(ChatAttachment attachment) async {
+    final chatProvider = Provider.of<MeshChatProvider>(context, listen: false);
 
     final path = await chatProvider.downloadFile(
       attachment.fileId,
@@ -643,20 +568,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     if (path == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to download this file.',
-          ),
-        ),
+        const SnackBar(content: Text('Unable to download this file.')),
       );
 
       return;
     }
 
-    final opened = await FileAccessService.openFile(
-      path,
-      attachment.mimeType,
-    );
+    final opened = await FileAccessService.openFile(path, attachment.mimeType);
 
     if (!mounted || opened) {
       return;
@@ -664,9 +582,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text(
-          'The file was downloaded but could not be opened.',
-        ),
+        content: Text('The file was downloaded but could not be opened.'),
       ),
     );
   }
@@ -681,13 +597,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 10,
-      ),
-      color: AppColors.primary.withOpacity(
-        0.12,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: AppColors.primary.withOpacity(0.12),
       child: Row(
         children: [
           const Icon(
@@ -695,24 +606,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             color: AppColors.primary,
             size: 14,
           ),
-          const SizedBox(
-            width: 8,
-          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Recording ${_formatDuration(_recordingDuration)}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
+              'Recording '
+              '${_formatDuration(_recordingDuration)}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
           TextButton(
-            onPressed: () => _stopVoiceRecording(
-              send: false,
-            ),
-            child: const Text(
-              'Cancel',
-            ),
+            onPressed: () => _stopVoiceRecording(send: false),
+            child: const Text('Cancel'),
           ),
         ],
       ),
@@ -727,36 +631,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     MeshChatProvider chatProvider,
     String currentId,
   ) {
-    final messages = chatProvider.messages.where(
-      (msg) {
-        // ------------------------------------------------------
-        // Broadcast channels
-        // ------------------------------------------------------
+    final messages = chatProvider.messages.where((msg) {
+      if (widget.receiverId == 'BROADCAST' ||
+          widget.receiverId == 'RESPONDERS_OPS') {
+        return msg.receiverId == widget.receiverId;
+      }
 
-        if (widget.receiverId == 'BROADCAST' ||
-            widget.receiverId == 'RESPONDERS_OPS') {
-          return msg.receiverId == widget.receiverId;
-        }
+      final sentByMe =
+          msg.senderId == currentId && msg.receiverId == widget.receiverId;
 
-        // ------------------------------------------------------
-        // Direct chat
-        // ------------------------------------------------------
+      final receivedFromUser =
+          msg.senderId == widget.receiverId && msg.receiverId == currentId;
 
-        final sentByMe =
-            msg.senderId == currentId && msg.receiverId == widget.receiverId;
+      return sentByMe || receivedFromUser;
+    }).toList();
 
-        final receivedFromUser =
-            msg.senderId == widget.receiverId && msg.receiverId == currentId;
-
-        return sentByMe || receivedFromUser;
-      },
-    ).toList();
-
-    messages.sort(
-      (a, b) => a.timestamp.compareTo(
-        b.timestamp,
-      ),
-    );
+    messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     return messages;
   }
@@ -766,64 +656,37 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final chatProvider = Provider.of<MeshChatProvider>(
-      context,
-    );
+  Widget build(BuildContext context) {
+    final chatProvider = Provider.of<MeshChatProvider>(context);
 
-    final authProvider = Provider.of<AuthProvider>(
-      context,
-      listen: false,
-    );
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     final currentId = authProvider.user?.id ?? chatProvider.currentUserId;
 
-    final messages = _getVisibleMessages(
-      chatProvider,
-      currentId,
-    );
+    final messages = _getVisibleMessages(chatProvider, currentId);
 
-    final isBroadcast = widget.receiverId == 'BROADCAST' ||
+    final isBroadcast =
+        widget.receiverId == 'BROADCAST' ||
         widget.receiverId == 'RESPONDERS_OPS';
 
-    final callProvider = Provider.of<CallProvider>(
-      context,
-      listen: false,
-    );
+    final callProvider = Provider.of<CallProvider>(context, listen: false);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.channelName,
-        ),
+        title: Text(widget.channelName),
         actions: isBroadcast
             ? null
             : [
-                // ------------------------------------------------
-                // AUDIO CALL
-                // ------------------------------------------------
-
                 IconButton(
-                  icon: const Icon(
-                    Icons.call_rounded,
-                  ),
+                  icon: const Icon(Icons.call_rounded),
                   onPressed: () => callProvider.startCall(
                     recipientId: widget.receiverId,
                     recipientName: widget.channelName,
                     type: CallType.audio,
                   ),
                 ),
-
-                // ------------------------------------------------
-                // VIDEO CALL
-                // ------------------------------------------------
-
                 IconButton(
-                  icon: const Icon(
-                    Icons.videocam_rounded,
-                  ),
+                  icon: const Icon(Icons.videocam_rounded),
                   onPressed: () => callProvider.startCall(
                     recipientId: widget.receiverId,
                     recipientName: widget.channelName,
@@ -832,11 +695,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 ),
               ],
       ),
-
-      // ========================================================
-      // BODY
-      // ========================================================
-
       body: Column(
         children: [
           // ======================================================
@@ -848,20 +706,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 ? const Center(
                     child: Text(
                       'No messages yet.',
-                      style: TextStyle(
-                        color: Colors.white54,
-                      ),
+                      style: TextStyle(color: Colors.white54),
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.all(
-                      16,
-                    ),
+                    padding: const EdgeInsets.all(16),
                     itemCount: messages.length,
-                    itemBuilder: (
-                      context,
-                      index,
-                    ) {
+                    itemBuilder: (context, index) {
                       final msg = messages[index];
 
                       final isMyMsg = msg.isMe || msg.senderId == currentId;
@@ -870,44 +721,29 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
                       final status =
                           chatProvider.deliveryStatusByPacketId[msg.packetId] ??
-                              'Queued';
+                          'Queued';
 
                       return Align(
                         alignment: isMyMsg
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
                         child: Container(
-                          margin: const EdgeInsets.only(
-                            bottom: 10,
-                          ),
-                          padding: const EdgeInsets.all(
-                            12,
-                          ),
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
                           constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(
-                                  context,
-                                ).size.width *
-                                0.78,
+                            maxWidth: MediaQuery.of(context).size.width * 0.78,
                           ),
                           decoration: BoxDecoration(
                             color: isSos
-                                ? AppColors.primary.withOpacity(
-                                    0.9,
-                                  )
+                                ? AppColors.primary.withOpacity(0.9)
                                 : isMyMsg
-                                    ? AppColors.secondary
-                                    : AppColors.darkCard,
-                            borderRadius: BorderRadius.circular(
-                              16,
-                            ),
+                                ? AppColors.secondary
+                                : AppColors.darkCard,
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // --------------------------------
-                              // SENDER
-                              // --------------------------------
-
                               Text(
                                 msg.senderName,
                                 style: const TextStyle(
@@ -916,34 +752,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                   color: Colors.white70,
                                 ),
                               ),
-
-                              const SizedBox(
-                                height: 5,
-                              ),
-
-                              // --------------------------------
-                              // FILE
-                              // --------------------------------
+                              const SizedBox(height: 5),
 
                               if (msg.attachment != null)
-                                _buildFileBubble(
-                                  msg.attachment!,
-                                )
-
-                              // --------------------------------
-                              // VOICE
-                              // --------------------------------
-
+                                _buildFileBubble(msg.attachment!)
                               else if (msg.voiceMessage != null)
                                 _buildVoiceBubble(
                                   voice: msg.voiceMessage!,
                                   messageId: msg.packetId,
                                 )
-
-                              // --------------------------------
-                              // TEXT
-                              // --------------------------------
-
                               else
                                 Text(
                                   msg.content,
@@ -953,13 +770,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                   ),
                                 ),
 
-                              const SizedBox(
-                                height: 5,
-                              ),
-
-                              // --------------------------------
-                              // MESSAGE STATUS
-                              // --------------------------------
+                              const SizedBox(height: 5),
 
                               Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -969,9 +780,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                     size: 11,
                                     color: Colors.white54,
                                   ),
-                                  const SizedBox(
-                                    width: 4,
-                                  ),
+                                  const SizedBox(width: 4),
                                   Text(
                                     isMyMsg
                                         ? '$status • Hops: ${msg.hopCount}'
@@ -994,45 +803,64 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           // ======================================================
           // RECORDING BAR
           // ======================================================
-
           _buildRecordingBar(),
 
           // ======================================================
           // INPUT BAR
           // ======================================================
-
           Container(
-            padding: const EdgeInsets.all(
-              12,
-            ),
+            padding: const EdgeInsets.all(12),
             color: AppColors.darkSurface,
             child: Row(
               children: [
                 // =================================================
-                // VOICE
+                // VOICE BUTTON
                 // =================================================
 
                 GestureDetector(
-                  onLongPressStart: (_) => _startVoiceRecording(),
-                  onLongPressEnd: (_) => _stopVoiceRecording(),
-                  child: CircleAvatar(
-                    backgroundColor:
-                        _isRecording ? AppColors.primary : AppColors.darkCard,
+                  behavior: HitTestBehavior.opaque,
+
+                  onLongPressStart: (_) {
+                    debugPrint('CHAT MIC UI: LONG PRESS START');
+
+                    _startVoiceRecording();
+                  },
+
+                  onLongPressEnd: (_) {
+                    debugPrint('CHAT MIC UI: LONG PRESS END');
+
+                    _stopVoiceRecording();
+                  },
+
+                  onLongPressCancel: () {
+                    debugPrint('CHAT MIC UI: LONG PRESS CANCEL');
+
+                    _stopVoiceRecording();
+                  },
+
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _isRecording
+                          ? AppColors.primary
+                          : AppColors.darkCard,
+                      shape: BoxShape.circle,
+                    ),
                     child: Icon(
                       _isRecording ? Icons.mic_rounded : Icons.mic_none_rounded,
                       color: Colors.white,
+                      size: 26,
                     ),
                   ),
                 ),
 
-                const SizedBox(
-                  width: 8,
-                ),
+                const SizedBox(width: 8),
 
                 // =================================================
                 // TEXT FIELD
                 // =================================================
-
                 Expanded(
                   child: TextField(
                     controller: _messageController,
@@ -1043,9 +871,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                           ? 'Recording...'
                           : 'Type mesh message...',
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          24,
-                        ),
+                        borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
                       ),
                       filled: true,
@@ -1059,14 +885,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   ),
                 ),
 
-                const SizedBox(
-                  width: 8,
-                ),
+                const SizedBox(width: 8),
 
                 // =================================================
                 // FILE
                 // =================================================
-
                 CircleAvatar(
                   backgroundColor: AppColors.darkCard,
                   child: IconButton(
@@ -1078,21 +901,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   ),
                 ),
 
-                const SizedBox(
-                  width: 8,
-                ),
+                const SizedBox(width: 8),
 
                 // =================================================
                 // SEND
                 // =================================================
-
                 CircleAvatar(
                   backgroundColor: AppColors.primary,
                   child: IconButton(
-                    icon: const Icon(
-                      Icons.send_rounded,
-                      color: Colors.white,
-                    ),
+                    icon: const Icon(Icons.send_rounded, color: Colors.white),
                     onPressed: _isRecording ? null : _sendMessage,
                   ),
                 ),

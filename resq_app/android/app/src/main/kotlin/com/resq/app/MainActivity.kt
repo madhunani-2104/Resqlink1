@@ -17,7 +17,6 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import com.resq.app.ble.BleMeshManager
 import com.resq.app.wifidirect.WifiDirectManager
-
 class MainActivity: FlutterActivity() {
     private val BLE_CHANNEL = "com.resq.app/ble_mesh"
     private val WIFI_CHANNEL = "com.resq.app/wifi_direct"
