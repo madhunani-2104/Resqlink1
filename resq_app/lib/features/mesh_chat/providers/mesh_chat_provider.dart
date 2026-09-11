@@ -76,19 +76,13 @@ class MeshChatProvider extends ChangeNotifier {
   // ============================================================
 
   List<ChatMessage> get messages {
-    return List.unmodifiable(
-      _messages,
-    );
+    return List.unmodifiable(_messages);
   }
 
   List<MeshPeer> get peers {
     final result = _peersById.values.toList();
 
-    result.sort(
-      (a, b) => b.lastSeen.compareTo(
-        a.lastSeen,
-      ),
-    );
+    result.sort((a, b) => b.lastSeen.compareTo(a.lastSeen));
 
     return result;
   }
@@ -106,21 +100,15 @@ class MeshChatProvider extends ChangeNotifier {
   }
 
   Map<String, String> get deliveryStatusByPacketId {
-    return Map.unmodifiable(
-      _deliveryStatusByPacketId,
-    );
+    return Map.unmodifiable(_deliveryStatusByPacketId);
   }
 
   // ============================================================
   // CONSTRUCTOR
   // ============================================================
 
-  MeshChatProvider(
-    this.currentUserId,
-  ) {
-    _meshRouter = MeshRouter(
-      localNodeId: currentUserId,
-    );
+  MeshChatProvider(this.currentUserId) {
+    _meshRouter = MeshRouter(localNodeId: currentUserId);
 
     _bleService = BleService(
       meshRouter: _meshRouter,
@@ -132,29 +120,19 @@ class MeshChatProvider extends ChangeNotifier {
       onPeerDiscovered: _upsertPeer,
     );
 
-    _webSimService = WebSimulationService(
-      meshRouter: _meshRouter,
-    );
+    _webSimService = WebSimulationService(meshRouter: _meshRouter);
 
     _socketService = MeshSocketService();
 
-    _listenToPackets(
-      currentUserId,
-    );
+    _listenToPackets(currentUserId);
 
-    _listenToSocketMessages(
-      currentUserId,
-    );
+    _listenToSocketMessages(currentUserId);
 
-    _loadServerMessages(
-      currentUserId,
-    );
+    _loadServerMessages(currentUserId);
 
     _socketService.connect();
 
-    _loadHistoricalMessages(
-      currentUserId,
-    );
+    _loadHistoricalMessages(currentUserId);
 
     startMeshNetworking();
   }
@@ -163,99 +141,79 @@ class MeshChatProvider extends ChangeNotifier {
   // PACKET LISTENER
   // ============================================================
 
-  void _listenToPackets(
-    String userId,
-  ) {
-    _packetSubscription = _meshRouter.onPacketReceived.listen(
-      (packet) async {
-        // ------------------------------------------------------
-        // SOS
-        // ------------------------------------------------------
+  void _listenToPackets(String userId) {
+    _packetSubscription = _meshRouter.onPacketReceived.listen((packet) async {
+      // ------------------------------------------------------
+      // SOS
+      // ------------------------------------------------------
 
-        if (packet.packetType == MeshPacketType.sosBeacon) {
-          NotificationService.showEmergencySosAlert(
-            victimName: packet.senderName,
-            locationText: '${packet.latitude ?? 0}, '
-                '${packet.longitude ?? 0}',
-            sosId: packet.packetId,
-          );
-        }
-
-        // ------------------------------------------------------
-        // ACK
-        // ------------------------------------------------------
-
-        if (packet.packetType == MeshPacketType.ack) {
-          final originalPacketId = packet.receiverId;
-
-          _deliveryStatusByPacketId[originalPacketId] = 'Delivered';
-
-          notifyListeners();
-
-          return;
-        }
-
-        // ------------------------------------------------------
-        // CHAT
-        // ------------------------------------------------------
-
-        _addMessageIfRelevant(
-          packet,
-          userId,
+      if (packet.packetType == MeshPacketType.sosBeacon) {
+        NotificationService.showEmergencySosAlert(
+          victimName: packet.senderName,
+          locationText:
+              '${packet.latitude ?? 0}, '
+              '${packet.longitude ?? 0}',
+          sosId: packet.packetId,
         );
+      }
 
-        // ------------------------------------------------------
-        // ACKNOWLEDGE
-        // ------------------------------------------------------
+      // ------------------------------------------------------
+      // ACK
+      // ------------------------------------------------------
 
-        if (packet.senderId != currentUserId) {
-          await _sendAcknowledgement(
-            packet,
-          );
-        }
+      if (packet.packetType == MeshPacketType.ack) {
+        final originalPacketId = packet.receiverId;
 
-        // ------------------------------------------------------
-        // RELAY
-        // ------------------------------------------------------
+        _deliveryStatusByPacketId[originalPacketId] = 'Delivered';
 
-        await _relayPendingPackets();
-      },
-    );
+        notifyListeners();
+
+        return;
+      }
+
+      // ------------------------------------------------------
+      // CHAT
+      // ------------------------------------------------------
+
+      _addMessageIfRelevant(packet, userId);
+
+      // ------------------------------------------------------
+      // ACKNOWLEDGE
+      // ------------------------------------------------------
+
+      if (packet.senderId != currentUserId) {
+        await _sendAcknowledgement(packet);
+      }
+
+      // ------------------------------------------------------
+      // RELAY
+      // ------------------------------------------------------
+
+      await _relayPendingPackets();
+    });
   }
 
   // ============================================================
   // SOCKET LISTENER
   // ============================================================
 
-  void _listenToSocketMessages(
-    String userId,
-  ) {
-    _socketMessageSubscription = _socketService.onMessage.listen(
-      (raw) {
-        try {
-          final packet = MeshPacket.fromJson(
-            raw,
-          );
+  void _listenToSocketMessages(String userId) {
+    _socketMessageSubscription = _socketService.onMessage.listen((raw) {
+      try {
+        final packet = MeshPacket.fromJson(raw);
 
-          _addMessageIfRelevant(
-            packet,
-            userId,
-          );
-        } catch (_) {
-          // Ignore malformed socket packets.
-        }
-      },
-    );
+        _addMessageIfRelevant(packet, userId);
+      } catch (_) {
+        // Ignore malformed socket packets.
+      }
+    });
   }
 
   // ============================================================
   // CHECK RELEVANT MESSAGE
   // ============================================================
 
-  bool _isRelevantToUser(
-    MeshPacket packet,
-    String userId,
-  ) {
+  bool _isRelevantToUser(MeshPacket packet, String userId) {
     if (packet.packetType != MeshPacketType.chat) {
       return false;
     }
@@ -280,14 +238,8 @@ class MeshChatProvider extends ChangeNotifier {
   // ADD MESSAGE
   // ============================================================
 
-  void _addMessageIfRelevant(
-    MeshPacket packet,
-    String userId,
-  ) {
-    if (!_isRelevantToUser(
-      packet,
-      userId,
-    )) {
+  void _addMessageIfRelevant(MeshPacket packet, String userId) {
+    if (!_isRelevantToUser(packet, userId)) {
       return;
     }
 
@@ -303,20 +255,11 @@ class MeshChatProvider extends ChangeNotifier {
       return;
     }
 
-    final message = ChatMessage.fromMeshPacket(
-      packet,
-      userId,
-    );
+    final message = ChatMessage.fromMeshPacket(packet, userId);
 
-    _messages.add(
-      message,
-    );
+    _messages.add(message);
 
-    _messages.sort(
-      (a, b) => a.timestamp.compareTo(
-        b.timestamp,
-      ),
-    );
+    _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     notifyListeners();
   }
@@ -325,13 +268,9 @@ class MeshChatProvider extends ChangeNotifier {
   // UPDATE PEER
   // ============================================================
 
-  void _upsertPeer(
-    Map<String, dynamic> rawPeer,
-  ) {
+  void _upsertPeer(Map<String, dynamic> rawPeer) {
     try {
-      final peer = MeshPeer.fromJson(
-        rawPeer,
-      );
+      final peer = MeshPeer.fromJson(rawPeer);
 
       if (peer.id.isEmpty) {
         return;
@@ -359,12 +298,8 @@ class MeshChatProvider extends ChangeNotifier {
     for (final packet in pendingPackets) {
       try {
         await Future.wait([
-          _bleService.broadcastPacket(
-            packet,
-          ),
-          _wifiDirectService.sendPacketP2P(
-            packet,
-          ),
+          _bleService.broadcastPacket(packet),
+          _wifiDirectService.sendPacketP2P(packet),
         ]);
       } catch (_) {
         // Continue relaying other packets.
@@ -376,9 +311,7 @@ class MeshChatProvider extends ChangeNotifier {
   // LOAD LOCAL MESSAGES
   // ============================================================
 
-  Future<void> _loadHistoricalMessages(
-    String userId,
-  ) async {
+  Future<void> _loadHistoricalMessages(String userId) async {
     try {
       final dbRows = await DBHelper.instance.getMessages();
 
@@ -386,20 +319,13 @@ class MeshChatProvider extends ChangeNotifier {
         try {
           final packet = MeshPacket.fromJson(row);
 
-          _addMessageIfRelevant(
-            packet,
-            userId,
-          );
+          _addMessageIfRelevant(packet, userId);
         } catch (_) {
           // Ignore invalid database packet.
         }
       }
 
-      _messages.sort(
-        (a, b) => a.timestamp.compareTo(
-          b.timestamp,
-        ),
-      );
+      _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
       notifyListeners();
     } catch (_) {
@@ -411,15 +337,11 @@ class MeshChatProvider extends ChangeNotifier {
   // LOAD SERVER MESSAGES
   // ============================================================
 
-  Future<void> _loadServerMessages(
-    String userId,
-  ) async {
+  Future<void> _loadServerMessages(String userId) async {
     try {
       final response = await _dioClient.instance.get(
         ApiEndpoints.meshMessages,
-        queryParameters: {
-          'limit': 200,
-        },
+        queryParameters: {'limit': 200},
       );
 
       final responseData = response.data;
@@ -437,19 +359,10 @@ class MeshChatProvider extends ChangeNotifier {
       for (final row in data) {
         try {
           if (row is Map<String, dynamic>) {
-            _addMessageIfRelevant(
-              MeshPacket.fromJson(
-                row,
-              ),
-              userId,
-            );
+            _addMessageIfRelevant(MeshPacket.fromJson(row), userId);
           } else if (row is Map) {
             _addMessageIfRelevant(
-              MeshPacket.fromJson(
-                Map<String, dynamic>.from(
-                  row,
-                ),
-              ),
+              MeshPacket.fromJson(Map<String, dynamic>.from(row)),
               userId,
             );
           }
@@ -458,11 +371,7 @@ class MeshChatProvider extends ChangeNotifier {
         }
       }
 
-      _messages.sort(
-        (a, b) => a.timestamp.compareTo(
-          b.timestamp,
-        ),
-      );
+      _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
       notifyListeners();
     } catch (_) {
@@ -518,9 +427,7 @@ class MeshChatProvider extends ChangeNotifier {
     // LOCAL
     // ----------------------------------------------------------
 
-    await _meshRouter.processIncomingPacket(
-      packet,
-    );
+    await _meshRouter.processIncomingPacket(packet);
 
     _deliveryStatusByPacketId[packet.packetId] = 'Sent to mesh';
 
@@ -550,17 +457,11 @@ class MeshChatProvider extends ChangeNotifier {
     try {
       if (!kIsWeb) {
         await Future.wait([
-          _bleService.broadcastPacket(
-            packet,
-          ),
-          _wifiDirectService.sendPacketP2P(
-            packet,
-          ),
+          _bleService.broadcastPacket(packet),
+          _wifiDirectService.sendPacketP2P(packet),
         ]);
       } else {
-        _webSimService.simulateIncomingPacket(
-          packet,
-        );
+        _webSimService.simulateIncomingPacket(packet);
       }
     } catch (_) {
       // Mesh failure does not delete local message.
@@ -577,14 +478,21 @@ class MeshChatProvider extends ChangeNotifier {
     required String voicePayload,
     required String receiverId,
   }) async {
-    final cleanPayload = voicePayload.trim();
+    final cleanPayload = _addVoiceMetadata(
+      voicePayload.trim(),
+      senderId: senderId,
+      senderName: senderName,
+      packetId: 'VOICE-${DateTime.now().microsecondsSinceEpoch}',
+    );
 
     if (cleanPayload.isEmpty) {
       return false;
     }
 
     final packet = MeshPacket(
-      packetId: 'VOICE-${DateTime.now().millisecondsSinceEpoch}',
+      packetId:
+          _voicePacketId(cleanPayload) ??
+          'VOICE-${DateTime.now().microsecondsSinceEpoch}',
       senderId: senderId,
       senderName: senderName,
       receiverId: receiverId,
@@ -597,9 +505,7 @@ class MeshChatProvider extends ChangeNotifier {
     // LOCAL
     // ----------------------------------------------------------
 
-    await _meshRouter.processIncomingPacket(
-      packet,
-    );
+    await _meshRouter.processIncomingPacket(packet);
 
     _deliveryStatusByPacketId[packet.packetId] = 'Sent to mesh';
 
@@ -633,19 +539,13 @@ class MeshChatProvider extends ChangeNotifier {
     try {
       if (!kIsWeb) {
         await Future.wait([
-          _bleService.broadcastPacket(
-            packet,
-          ),
-          _wifiDirectService.sendPacketP2P(
-            packet,
-          ),
+          _bleService.broadcastPacket(packet),
+          _wifiDirectService.sendPacketP2P(packet),
         ]);
 
         delivered = true;
       } else {
-        _webSimService.simulateIncomingPacket(
-          packet,
-        );
+        _webSimService.simulateIncomingPacket(packet);
 
         delivered = true;
       }
@@ -654,6 +554,42 @@ class MeshChatProvider extends ChangeNotifier {
     }
 
     return delivered;
+  }
+
+  String _addVoiceMetadata(
+    String payload, {
+    required String senderId,
+    required String senderName,
+    required String packetId,
+  }) {
+    try {
+      final decoded = jsonDecode(
+        utf8.decode(base64Decode(payload), allowMalformed: false),
+      );
+      if (decoded is! Map) return payload;
+
+      final data = Map<String, dynamic>.from(decoded);
+      data['messageId'] = packetId;
+      data['senderNodeId'] = senderId;
+      data['senderName'] = senderName;
+      data['timestamp'] = DateTime.now().toIso8601String();
+      data['fileReference'] = data['fileName']?.toString();
+
+      return base64Encode(utf8.encode(jsonEncode(data)));
+    } catch (_) {
+      return payload;
+    }
+  }
+
+  String? _voicePacketId(String payload) {
+    try {
+      final decoded = jsonDecode(
+        utf8.decode(base64Decode(payload), allowMalformed: false),
+      );
+      return decoded is Map ? decoded['messageId']?.toString() : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   // ============================================================
@@ -674,9 +610,7 @@ class MeshChatProvider extends ChangeNotifier {
       // Read local copy for offline transfer.
       // --------------------------------------------------------
 
-      final inlineBase64 = await _fileTransferService.readInlineBase64(
-        path,
-      );
+      final inlineBase64 = await _fileTransferService.readInlineBase64(path);
 
       // --------------------------------------------------------
       // Upload to server.
@@ -696,7 +630,8 @@ class MeshChatProvider extends ChangeNotifier {
         return false;
       }
 
-      final fileId = uploaded?.fileId ??
+      final fileId =
+          uploaded?.fileId ??
           'LOCAL-${DateTime.now().millisecondsSinceEpoch}.bin';
 
       final metadata = jsonEncode({
@@ -722,12 +657,11 @@ class MeshChatProvider extends ChangeNotifier {
       // LOCAL
       // --------------------------------------------------------
 
-      await _meshRouter.processIncomingPacket(
-        packet,
-      );
+      await _meshRouter.processIncomingPacket(packet);
 
-      _deliveryStatusByPacketId[packet.packetId] =
-          uploaded == null ? 'Sent to mesh (offline)' : 'Sent to mesh';
+      _deliveryStatusByPacketId[packet.packetId] = uploaded == null
+          ? 'Sent to mesh (offline)'
+          : 'Sent to mesh';
 
       notifyListeners();
 
@@ -756,17 +690,11 @@ class MeshChatProvider extends ChangeNotifier {
 
       if (!kIsWeb) {
         await Future.wait([
-          _wifiDirectService.sendPacketP2P(
-            packet,
-          ),
-          _bleService.broadcastPacket(
-            packet,
-          ),
+          _wifiDirectService.sendPacketP2P(packet),
+          _bleService.broadcastPacket(packet),
         ]);
       } else {
-        _webSimService.simulateIncomingPacket(
-          packet,
-        );
+        _webSimService.simulateIncomingPacket(packet);
       }
 
       return true;
@@ -803,22 +731,15 @@ class MeshChatProvider extends ChangeNotifier {
     // Otherwise download from server.
     // ----------------------------------------------------------
 
-    return _fileTransferService.download(
-      fileId: fileId,
-      fileName: fileName,
-    );
+    return _fileTransferService.download(fileId: fileId, fileName: fileName);
   }
 
   // ============================================================
   // BROADCAST SOS
   // ============================================================
 
-  Future<void> broadcastEmergencySos(
-    MeshPacket packet,
-  ) async {
-    await _meshRouter.processIncomingPacket(
-      packet,
-    );
+  Future<void> broadcastEmergencySos(MeshPacket packet) async {
+    await _meshRouter.processIncomingPacket(packet);
 
     _deliveryStatusByPacketId[packet.packetId] = 'Sent to mesh';
 
@@ -827,17 +748,11 @@ class MeshChatProvider extends ChangeNotifier {
     try {
       if (!kIsWeb) {
         await Future.wait([
-          _bleService.broadcastPacket(
-            packet,
-          ),
-          _wifiDirectService.sendPacketP2P(
-            packet,
-          ),
+          _bleService.broadcastPacket(packet),
+          _wifiDirectService.sendPacketP2P(packet),
         ]);
       } else {
-        _webSimService.simulateIncomingPacket(
-          packet,
-        );
+        _webSimService.simulateIncomingPacket(packet);
       }
     } catch (_) {
       // SOS remains locally recorded.
@@ -848,15 +763,14 @@ class MeshChatProvider extends ChangeNotifier {
   // ACK
   // ============================================================
 
-  Future<void> _sendAcknowledgement(
-    MeshPacket receivedPacket,
-  ) async {
+  Future<void> _sendAcknowledgement(MeshPacket receivedPacket) async {
     if (receivedPacket.packetType == MeshPacketType.ack || kIsWeb) {
       return;
     }
 
     final ackPacket = MeshPacket(
-      packetId: 'ACK-${receivedPacket.packetId}-'
+      packetId:
+          'ACK-${receivedPacket.packetId}-'
           '${DateTime.now().millisecondsSinceEpoch}',
       senderId: currentUserId,
       senderName: 'ResQ Node',
@@ -868,12 +782,8 @@ class MeshChatProvider extends ChangeNotifier {
 
     try {
       await Future.wait([
-        _bleService.broadcastPacket(
-          ackPacket,
-        ),
-        _wifiDirectService.sendPacketP2P(
-          ackPacket,
-        ),
+        _bleService.broadcastPacket(ackPacket),
+        _wifiDirectService.sendPacketP2P(ackPacket),
       ]);
     } catch (_) {
       // ACK transmission failed.

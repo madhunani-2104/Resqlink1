@@ -1,14 +1,23 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
+import 'voice_file_storage.dart';
+
 class VoiceRecordingService {
   static final AudioRecorder _recorder = AudioRecorder();
   static final AudioPlayer _player = AudioPlayer();
+
+  static Stream<Duration> get playbackPositionStream =>
+      _player.onPositionChanged;
+
+  static Stream<Duration> get playbackDurationStream =>
+      _player.onDurationChanged;
+
+  static Stream<void> get playbackCompleteStream => _player.onPlayerComplete;
 
   static bool _isRecording = false;
   static DateTime? _recordingStartedAt;
@@ -100,20 +109,14 @@ class VoiceRecordingService {
         return null;
       }
 
-      final file = File(path);
+      final bytes = await readVoiceFile(path);
 
-      if (!await file.exists()) {
-        return null;
-      }
-
-      final size = await file.length();
-
-      if (size <= 0) {
+      if (bytes == null || bytes.isEmpty) {
         return null;
       }
 
       print('VOICE SAVED: $path');
-      print('VOICE SIZE: $size bytes');
+      print('VOICE SIZE: ${bytes.length} bytes');
 
       return path;
     } catch (e) {
@@ -140,15 +143,9 @@ class VoiceRecordingService {
     Duration? duration,
   }) async {
     try {
-      final file = File(path);
+      final bytes = await readVoiceFile(path);
 
-      if (!await file.exists()) {
-        return null;
-      }
-
-      final bytes = await file.readAsBytes();
-
-      if (bytes.isEmpty) {
+      if (bytes == null || bytes.isEmpty) {
         return null;
       }
 
@@ -157,16 +154,14 @@ class VoiceRecordingService {
       final payload = {
         'version': 1,
         'mimeType': 'audio/mp4',
-        'fileName': path.split('/').last,
+        'fileName': _safeFileName(path),
         'durationMs': actualDuration.inMilliseconds,
         'audio': base64Encode(bytes),
       };
 
       final jsonString = jsonEncode(payload);
 
-      return base64Encode(
-        utf8.encode(jsonString),
-      );
+      return base64Encode(utf8.encode(jsonString));
     } catch (e) {
       print('VOICE PAYLOAD ERROR: $e');
 
@@ -178,19 +173,11 @@ class VoiceRecordingService {
   // READ RAW BASE64
   // ============================================================
 
-  static Future<String?> readRecordingBase64(
-    String path,
-  ) async {
+  static Future<String?> readRecordingBase64(String path) async {
     try {
-      final file = File(path);
+      final bytes = await readVoiceFile(path);
 
-      if (!await file.exists()) {
-        return null;
-      }
-
-      final bytes = await file.readAsBytes();
-
-      if (bytes.isEmpty) {
+      if (bytes == null || bytes.isEmpty) {
         return null;
       }
 
@@ -215,10 +202,7 @@ class VoiceRecordingService {
   // 3. Old raw audio base64
   // ============================================================
 
-  static Future<bool> playBase64(
-    String payload, {
-    String? playbackId,
-  }) async {
+  static Future<bool> playBase64(String payload, {String? playbackId}) async {
     try {
       if (payload.trim().isEmpty) {
         return false;
@@ -239,9 +223,7 @@ class VoiceRecordingService {
         final data = jsonDecode(decodedJson);
 
         if (data is Map && data['audio'] != null) {
-          audioBytes = base64Decode(
-            data['audio'].toString(),
-          );
+          audioBytes = base64Decode(data['audio'].toString());
         } else {
           audioBytes = base64Decode(payload);
         }
@@ -259,12 +241,7 @@ class VoiceRecordingService {
 
       await _player.stop();
 
-      await _player.play(
-        BytesSource(
-          audioBytes,
-          mimeType: 'audio/mp4',
-        ),
-      );
+      await _player.play(BytesSource(audioBytes, mimeType: 'audio/mp4'));
 
       return true;
     } catch (e) {
@@ -278,24 +255,15 @@ class VoiceRecordingService {
   // PLAY LOCAL FILE
   // ============================================================
 
-  static Future<bool> playFile(
-    String path,
-  ) async {
+  static Future<bool> playFile(String path) async {
     try {
-      final file = File(path);
-
-      if (!await file.exists()) {
+      if (!await voiceFileExists(path)) {
         return false;
       }
 
       await _player.stop();
 
-      await _player.play(
-        DeviceFileSource(
-          path,
-          mimeType: 'audio/mp4',
-        ),
-      );
+      await _player.play(DeviceFileSource(path, mimeType: 'audio/mp4'));
 
       return true;
     } catch (e) {
@@ -327,5 +295,12 @@ class VoiceRecordingService {
     try {
       await _player.dispose();
     } catch (_) {}
+  }
+
+  static String _safeFileName(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final candidate = normalized.split('/').last;
+    final safe = candidate.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return safe.isEmpty ? 'voice_message.m4a' : safe;
   }
 }
