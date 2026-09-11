@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/services.dart';
 
 import '../../../core/constants/app_constants.dart';
@@ -7,13 +8,16 @@ import '../../../core/utils/mesh_packet.dart';
 import 'mesh_router.dart';
 
 class BleService {
-  static const MethodChannel _channel = MethodChannel(AppConstants.channelBleMesh);
+  static const MethodChannel _channel = MethodChannel(
+    AppConstants.channelBleMesh,
+  );
   final MeshRouter meshRouter;
   final void Function(Map<String, dynamic> peer)? onPeerDiscovered;
+  final void Function(Map<String, dynamic> status)? onStatus;
   bool isScanning = false;
   bool isBroadcasting = false;
 
-  BleService({required this.meshRouter, this.onPeerDiscovered}) {
+  BleService({required this.meshRouter, this.onPeerDiscovered, this.onStatus}) {
     _channel.setMethodCallHandler(_handleNativeMethodCall);
   }
 
@@ -23,7 +27,10 @@ class BleService {
       AppLogger.info('Starting BLE Mesh Discovery & Scanning...', 'BleService');
       await _channel.invokeMethod('startScan');
     } catch (e) {
-      AppLogger.warning('Native BLE scan fallback active (simulated scan): $e', 'BleService');
+      AppLogger.warning(
+        'Native BLE scan fallback active (simulated scan): $e',
+        'BleService',
+      );
     }
   }
 
@@ -38,12 +45,18 @@ class BleService {
 
   Future<void> broadcastPacket(MeshPacket packet) async {
     try {
-      AppLogger.info('Broadcasting BLE Packet: ${packet.packetId}', 'BleService');
+      AppLogger.info(
+        'Broadcasting BLE Packet: ${packet.packetId}',
+        'BleService',
+      );
       await _channel.invokeMethod('broadcastPacket', {
         'packetData': packet.toPayloadString(),
       });
     } catch (e) {
-      AppLogger.warning('BLE broadcast failed or permission was denied: $e', 'BleService');
+      AppLogger.warning(
+        'BLE broadcast failed or permission was denied: $e',
+        'BleService',
+      );
     }
   }
 
@@ -58,8 +71,15 @@ class BleService {
         final peer = Map<String, dynamic>.from(call.arguments as Map);
         onPeerDiscovered?.call(peer);
         break;
+      case 'onStatus':
+        final status = Map<String, dynamic>.from(call.arguments as Map);
+        onStatus?.call(status);
+        break;
       default:
-        AppLogger.warning('Unknown method ${call.method} on BLE channel', 'BleService');
+        AppLogger.warning(
+          'Unknown method ${call.method} on BLE channel',
+          'BleService',
+        );
     }
   }
 }
