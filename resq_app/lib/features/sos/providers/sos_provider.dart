@@ -31,6 +31,7 @@ class SosProvider extends ChangeNotifier {
   StreamSubscription<Map<String, dynamic>>? _newAlertSubscription;
   StreamSubscription<Map<String, dynamic>>? _statusSubscription;
   StreamSubscription<Map<String, dynamic>>? _emergencySubscription;
+  StreamSubscription<Map<String, dynamic>>? _dispatchSubscription;
 
   Timer? _rescueRefreshTimer;
 
@@ -41,6 +42,108 @@ class SosProvider extends ChangeNotifier {
   List<SosModel> get activeSosList => _activeSosList;
 
   bool get isLoading => _isLoading;
+
+  List<Map<String, dynamic>> _responders = [];
+
+  List<Map<String, dynamic>> get responders => List.unmodifiable(_responders);
+
+  Future<void> fetchDispatchQueue() async {
+    try {
+      final response = await _dioClient.instance.get(
+        ApiEndpoints.adminDispatch,
+      );
+      if (response.data['success'] == true) {
+        _activeSosList = (response.data['data'] as List)
+            .map((item) => SosModel.fromJson(Map<String, dynamic>.from(item)))
+            .toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      AppLogger.warning('Failed to load dispatch queue: $e', 'SosProvider');
+    }
+  }
+
+  Future<void> fetchResponders() async {
+    try {
+      final response = await _dioClient.instance.get(
+        ApiEndpoints.adminResponders,
+      );
+      if (response.data['success'] == true) {
+        _responders = (response.data['data'] as List)
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      AppLogger.warning('Failed to load responders: $e', 'SosProvider');
+    }
+  }
+
+  Future<bool> assignResponder(String alertId, String responderId) async {
+    try {
+      final response = await _dioClient.instance.put(
+        ApiEndpoints.assignDispatch(alertId),
+        data: {'responderId': responderId},
+      );
+      if (response.data['success'] == true) {
+        final alert = SosModel.fromJson(
+          Map<String, dynamic>.from(response.data['data']),
+        );
+        _replaceAlert(alert);
+        await fetchResponders();
+        return true;
+      }
+    } catch (e) {
+      AppLogger.warning('Failed to assign responder: $e', 'SosProvider');
+    }
+    return false;
+  }
+
+  Future<bool> updateDispatchStatus(String alertId, String status) async {
+    try {
+      final response = await _dioClient.instance.put(
+        ApiEndpoints.dispatchStatus(alertId),
+        data: {'status': status},
+      );
+      if (response.data['success'] == true) {
+        _replaceAlert(
+          SosModel.fromJson(Map<String, dynamic>.from(response.data['data'])),
+        );
+        return true;
+      }
+    } catch (e) {
+      AppLogger.warning('Failed to update dispatch status: $e', 'SosProvider');
+    }
+    return false;
+  }
+
+  Future<bool> setResponderAvailability(String status) async {
+    try {
+      final response = await _dioClient.instance.put(
+        ApiEndpoints.responderAvailability,
+        data: {'availabilityStatus': status},
+      );
+      return response.data['success'] == true;
+    } catch (e) {
+      AppLogger.warning(
+        'Failed to update responder availability: $e',
+        'SosProvider',
+      );
+      return false;
+    }
+  }
+
+  void _replaceAlert(SosModel alert) {
+    final index = _activeSosList.indexWhere(
+      (item) => item.sosId == alert.sosId,
+    );
+    if (index >= 0) {
+      _activeSosList[index] = alert;
+    } else {
+      _activeSosList.insert(0, alert);
+    }
+    notifyListeners();
+  }
 
   // ==============================================================
   // RESCUE / ADMIN SOCKET
@@ -92,6 +195,17 @@ class SosProvider extends ChangeNotifier {
           'Failed to process SOS status update',
           e,
           null,
+          'SosProvider',
+        );
+      }
+    });
+
+    _dispatchSubscription ??= _socketService.onDispatchUpdated.listen((data) {
+      try {
+        _replaceAlert(SosModel.fromJson(data));
+      } catch (e) {
+        AppLogger.warning(
+          'Failed to process dispatch update: $e',
           'SosProvider',
         );
       }
@@ -526,6 +640,7 @@ class SosProvider extends ChangeNotifier {
     _newAlertSubscription?.cancel();
     _statusSubscription?.cancel();
     _emergencySubscription?.cancel();
+    _dispatchSubscription?.cancel();
     _rescueRefreshTimer?.cancel();
 
     _socketService.dispose();

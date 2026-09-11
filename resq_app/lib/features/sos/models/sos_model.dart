@@ -10,6 +10,9 @@ class SosModel {
   final double accuracy;
   final int batteryLevel;
   final String status; // 'ACTIVE', 'ACKNOWLEDGED', 'RESCUED', 'CANCELLED'
+  final String? assignedResponderId;
+  final String? assignedResponderName;
+  final DateTime? assignedAt;
   final String severity; // 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'
   final String? riskLevel; // 'LOW', 'MEDIUM', 'HIGH'
   final double? riskScore;
@@ -32,6 +35,9 @@ class SosModel {
     this.accuracy = 0.0,
     this.batteryLevel = 100,
     this.status = 'ACTIVE',
+    this.assignedResponderId,
+    this.assignedResponderName,
+    this.assignedAt,
     this.severity = 'CRITICAL',
     this.riskLevel,
     this.riskScore,
@@ -47,15 +53,21 @@ class SosModel {
     return SosModel(
       id: json['_id'] ?? json['id'] ?? '',
       sosId: json['sosId'] ?? '',
-      userId: json['userId'] is Map ? json['userId']['_id'] : (json['userId'] ?? ''),
+      userId: json['userId'] is Map
+          ? json['userId']['_id']
+          : (json['userId'] ?? ''),
       userName: json['userName'] ?? 'Victim',
       userPhone: json['userPhone'] ?? '',
       latitude: json['location'] != null
           ? (json['location']['latitude'] as num).toDouble()
-          : (json['latitude'] != null ? (json['latitude'] as num).toDouble() : 0.0),
+          : (json['latitude'] != null
+                ? (json['latitude'] as num).toDouble()
+                : 0.0),
       longitude: json['location'] != null
           ? (json['location']['longitude'] as num).toDouble()
-          : (json['longitude'] != null ? (json['longitude'] as num).toDouble() : 0.0),
+          : (json['longitude'] != null
+                ? (json['longitude'] as num).toDouble()
+                : 0.0),
       altitude: json['location'] != null
           ? (json['location']['altitude'] as num? ?? 0.0).toDouble()
           : (json['altitude'] as num? ?? 0.0).toDouble(),
@@ -64,13 +76,23 @@ class SosModel {
           : (json['accuracy'] as num? ?? 0.0).toDouble(),
       batteryLevel: json['batteryLevel'] ?? 100,
       status: json['status'] ?? 'ACTIVE',
+      assignedResponderId: json['assignedResponder'] is Map
+          ? json['assignedResponder']['_id']?.toString()
+          : json['assignedResponder']?.toString(),
+      assignedResponderName: json['assignedResponder'] is Map
+          ? json['assignedResponder']['name']?.toString()
+          : null,
+      assignedAt: DateTime.tryParse(json['assignedAt']?.toString() ?? ''),
       severity: json['severity'] ?? 'CRITICAL',
       riskLevel: json['riskLevel']?.toString(),
       riskScore: (json['riskScore'] as num?)?.toDouble(),
       riskReason: json['riskReason'] ?? '',
-      riskPredictedAt: json['riskPredictedAt'] != null ? DateTime.tryParse(json['riskPredictedAt'].toString()) : null,
+      riskPredictedAt: json['riskPredictedAt'] != null
+          ? DateTime.tryParse(json['riskPredictedAt'].toString())
+          : null,
       notes: json['notes'] ?? '',
-      isMeshRelayed: json['isMeshRelayed'] == 1 || json['isMeshRelayed'] == true,
+      isMeshRelayed:
+          json['isMeshRelayed'] == 1 || json['isMeshRelayed'] == true,
       relayHops: json['relayHops'] ?? 0,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
@@ -91,6 +113,10 @@ class SosModel {
       'accuracy': accuracy,
       'batteryLevel': batteryLevel,
       'status': status,
+      if (assignedResponderId != null) 'assignedResponder': assignedResponderId,
+      if (assignedResponderName != null)
+        'assignedResponderName': assignedResponderName,
+      if (assignedAt != null) 'assignedAt': assignedAt!.toIso8601String(),
       'severity': severity,
       'riskLevel': riskLevel,
       'riskScore': riskScore,

@@ -297,6 +297,8 @@ const getActiveSosAlerts = async (
         status: {
           $in: [
             'ACTIVE',
+              'PENDING',
+              'ASSIGNED',
             'ACKNOWLEDGED',
           ],
         },
@@ -340,6 +342,22 @@ const acknowledgeSosAlert = async (
       return res.status(404).json({
         success: false,
         message: 'SOS Alert not found',
+      });
+    }
+
+    if (!['PENDING', 'ASSIGNED', 'ACTIVE'].includes(alert.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Cannot acknowledge SOS in ${alert.status} state`,
+      });
+    }
+
+    if (alert.assignedResponder &&
+        alert.assignedResponder.toString() !== req.user._id.toString() &&
+        req.user.role === 'rescue_team') {
+      return res.status(403).json({
+        success: false,
+        message: 'SOS is assigned to another responder',
       });
     }
 
@@ -400,6 +418,13 @@ const resolveSosAlert = async (
       });
     }
 
+    if (!['ACKNOWLEDGED', 'ASSIGNED', 'ACTIVE'].includes(alert.status)) {
+      return res.status(409).json({
+        success: false,
+        message: `Cannot resolve SOS in ${alert.status} state`,
+      });
+    }
+
     // ----------------------------------------------------------
     // Assign helper if nobody acknowledged yet
     // ----------------------------------------------------------
@@ -434,7 +459,7 @@ const resolveSosAlert = async (
     const wasAlreadyRescued =
       alert.status === 'RESCUED';
 
-    alert.status = 'RESCUED';
+    alert.status = 'RESOLVED';
 
     alert.resolvedAt =
       alert.resolvedAt ||

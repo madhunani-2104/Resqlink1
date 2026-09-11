@@ -19,12 +19,18 @@ class SosSocketService {
   final StreamController<Map<String, dynamic>> _emergencyController =
       StreamController<Map<String, dynamic>>.broadcast();
 
+  final StreamController<Map<String, dynamic>> _dispatchController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
   Stream<Map<String, dynamic>> get onNewAlert => _newAlertController.stream;
 
   Stream<Map<String, dynamic>> get onStatusUpdated => _statusController.stream;
 
   Stream<Map<String, dynamic>> get onEmergencyAlert =>
       _emergencyController.stream;
+
+  Stream<Map<String, dynamic>> get onDispatchUpdated =>
+      _dispatchController.stream;
 
   Future<void> connect({required String role}) async {
     if (_socket?.readyState == WebSocket.open) {
@@ -114,6 +120,9 @@ class SosSocketService {
         case 'sos_status_updated':
           _statusController.add(data);
           break;
+        case 'dispatch_updated':
+          _dispatchController.add(data);
+          break;
       }
     } catch (e) {
       AppLogger.warning('Invalid SOS socket payload: $e', 'SosSocketService');
@@ -144,6 +153,10 @@ class SosSocketService {
 
     if (!_emergencyController.isClosed) {
       _emergencyController.close();
+    }
+
+    if (!_dispatchController.isClosed) {
+      _dispatchController.close();
     }
   }
 }

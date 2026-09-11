@@ -108,4 +108,14 @@ class ApiEndpoints {
   static const String adminStats = '/admin/stats';
 
   static const String adminUsers = '/admin/users';
+
+  static const String adminDispatch = '/admin/dispatch';
+
+  static const String adminResponders = '/admin/responders';
+
+  static String assignDispatch(String id) => '/admin/dispatch/$id/assign';
+
+  static String dispatchStatus(String id) => '/admin/dispatch/$id/status';
+
+  static const String responderAvailability = '/admin/responder/availability';
 }

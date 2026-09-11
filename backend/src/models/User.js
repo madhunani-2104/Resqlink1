@@ -32,6 +32,11 @@ const UserSchema = new mongoose.Schema(
       updatedAt: { type: Date },
     },
     isOnline: { type: Boolean, default: false },
+    availabilityStatus: {
+      type: String,
+      enum: ['AVAILABLE', 'BUSY', 'OFFLINE'],
+      default: 'OFFLINE',
+    },
     helpPoints: { type: Number, default: 0, min: 0 },
     rescuesCompleted: { type: Number, default: 0, min: 0 },
     isActive: { type: Boolean, default: true },
