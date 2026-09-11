@@ -47,6 +47,7 @@ class MainActivity: FlutterActivity() {
                 "startScan" -> {
                     if (!hasAllPermissions(requiredBlePermissions())) {
                         requestPermissions(requiredBlePermissions(), BLE_PERMISSION_REQUEST)
+                        bleManager.notifyPermissionRequired()
                         result.success(false)
                         return@setMethodCallHandler
                     }
@@ -60,6 +61,7 @@ class MainActivity: FlutterActivity() {
                 "broadcastPacket" -> {
                     if (!hasAllPermissions(requiredBlePermissions())) {
                         requestPermissions(requiredBlePermissions(), BLE_PERMISSION_REQUEST)
+                        bleManager.notifyPermissionRequired()
                         result.success(false)
                         return@setMethodCallHandler
                     }
@@ -79,6 +81,7 @@ class MainActivity: FlutterActivity() {
                 "discoverPeers" -> {
                     if (!hasAllPermissions(requiredWifiDirectPermissions())) {
                         requestPermissions(requiredWifiDirectPermissions(), WIFI_PERMISSION_REQUEST)
+                        wifiManager.notifyPermissionRequired()
                         result.success(false)
                         return@setMethodCallHandler
                     }
@@ -88,6 +91,7 @@ class MainActivity: FlutterActivity() {
                 "sendPacket" -> {
                     if (!hasAllPermissions(requiredWifiDirectPermissions())) {
                         requestPermissions(requiredWifiDirectPermissions(), WIFI_PERMISSION_REQUEST)
+                        wifiManager.notifyPermissionRequired()
                         result.success(false)
                         return@setMethodCallHandler
                     }
@@ -181,6 +185,28 @@ class MainActivity: FlutterActivity() {
                     result.success(playVoiceBase64(payload))
                 }
                 else -> result.notImplemented()
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        val granted = grantResults.isNotEmpty() &&
+            grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+
+        when (requestCode) {
+            BLE_PERMISSION_REQUEST -> {
+                if (granted) bleManager.notifyPermissionGranted()
+                else bleManager.notifyPermissionDenied()
+            }
+            WIFI_PERMISSION_REQUEST -> {
+                if (granted) wifiManager.notifyPermissionGranted()
+                else wifiManager.notifyPermissionDenied()
             }
         }
     }

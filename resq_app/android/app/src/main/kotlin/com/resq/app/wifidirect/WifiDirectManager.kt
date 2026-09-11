@@ -11,10 +11,12 @@ import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import com.resq.app.crypto.MeshCrypto
+import com.resq.app.mesh.MeshNodeIdentity
 import io.flutter.plugin.common.MethodChannel
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -30,6 +32,8 @@ class WifiDirectManager(private val context: Context, private val channel: Metho
     private val manager = context.getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
     private val p2pChannel = manager.initialize(context, Looper.getMainLooper(), null)
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val identity = MeshNodeIdentity(context)
+    private val wifiManager = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
     private val executor = Executors.newCachedThreadPool()
     private val clients = Collections.synchronizedList(mutableListOf<Socket>())
     private val pendingPackets = ConcurrentLinkedQueue<String>()
@@ -38,6 +42,7 @@ class WifiDirectManager(private val context: Context, private val channel: Metho
     private var serverSocket: ServerSocket? = null
     private var clientSocket: Socket? = null
     private var lastConnectedAddress: String? = null
+    private var lastPeerNodeId: String? = null
 
     companion object {
         private const val PORT = 8988
@@ -46,12 +51,19 @@ class WifiDirectManager(private val context: Context, private val channel: Metho
 
     @SuppressLint("MissingPermission")
     fun discoverPeers() {
-        if (!hasWifiDirectPermissions()) return
+        if (!hasWifiDirectPermissions()) {
+            notifyStatus("permission_denied", "Wi-Fi Direct permissions are required")
+            return
+        }
+        if (!wifiManager.isWifiEnabled) {
+            notifyStatus("disabled", "Wi-Fi is disabled")
+            return
+        }
         registerReceiverIfNeeded()
 
         manager.discoverPeers(p2pChannel, object : WifiP2pManager.ActionListener {
-            override fun onSuccess() = Unit
-            override fun onFailure(reason: Int) = Unit
+            override fun onSuccess() = notifyStatus("scanning", "Wi-Fi Direct discovery started")
+            override fun onFailure(reason: Int) = notifyStatus("error", "Wi-Fi Direct discovery failed: $reason")
         })
     }
 
@@ -63,6 +75,18 @@ class WifiDirectManager(private val context: Context, private val channel: Metho
             pendingPackets.add(packetData)
             discoverPeers()
         }
+    }
+
+    fun notifyPermissionRequired() {
+        notifyStatus("permission_required", "Wi-Fi Direct permissions are required")
+    }
+
+    fun notifyPermissionGranted() {
+        notifyStatus("idle", "Wi-Fi Direct permissions granted")
+    }
+
+    fun notifyPermissionDenied() {
+        notifyStatus("permission_denied", "Wi-Fi Direct permissions were denied")
     }
 
     @SuppressLint("MissingPermission")
@@ -81,7 +105,13 @@ class WifiDirectManager(private val context: Context, private val channel: Metho
     }
 
     private fun handleConnectionInfo(info: WifiP2pInfo) {
-        if (!info.groupFormed) return
+        if (!info.groupFormed) {
+            lastPeerNodeId?.let { nodeId ->
+                notifyPeer(nodeId, lastConnectedAddress ?: "", "Wi-Fi Direct peer", "disconnected", false)
+            }
+            notifyStatus("disconnected", "Wi-Fi Direct peer disconnected")
+            return
+        }
 
         if (info.isGroupOwner) {
             startServer()
@@ -103,6 +133,7 @@ class WifiDirectManager(private val context: Context, private val channel: Metho
                     val socket = serverSocket!!.accept()
                     clients.add(socket)
                     startSocketReader(socket)
+                    sendHello(socket)
                     flushPendingPackets()
                 }
             } catch (_: Exception) {
@@ -121,9 +152,11 @@ class WifiDirectManager(private val context: Context, private val channel: Metho
                 socket.connect(InetSocketAddress(address, PORT), SOCKET_TIMEOUT_MS)
                 clientSocket = socket
                 startSocketReader(socket)
+                sendHello(socket)
                 flushPendingPackets()
             } catch (_: Exception) {
                 clientSocket = null
+                notifyStatus("error", "Unable to connect to Wi-Fi Direct peer")
             }
         }
     }
@@ -134,6 +167,16 @@ class WifiDirectManager(private val context: Context, private val channel: Metho
                 val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
                 while (!socket.isClosed) {
                     val packetData = MeshCrypto.decrypt(reader.readLine() ?: break)
+                    if (packetData.startsWith("HELLO|")) {
+                        val peerNodeId = packetData.removePrefix("HELLO|").trim()
+                        if (peerNodeId.isNotBlank()) {
+                            val address = socket.inetAddress?.hostAddress ?: ""
+                            lastPeerNodeId = peerNodeId
+                            lastConnectedAddress = address
+                            notifyPeer(peerNodeId, address, "Wi-Fi Direct peer", "connected", true)
+                        }
+                        continue
+                    }
                     if (packetData.isNotBlank()) {
                         mainHandler.post {
                             channel.invokeMethod("onP2pPacketReceived", mapOf("packetData" to packetData))
@@ -181,6 +224,10 @@ class WifiDirectManager(private val context: Context, private val channel: Metho
         }
     }
 
+    private fun sendHello(socket: Socket) {
+        writeToSocket(socket, "HELLO|${identity.nodeId}")
+    }
+
     private fun flushPendingPackets() {
         while (pendingPackets.isNotEmpty()) {
             val packet = pendingPackets.poll() ?: break
@@ -216,10 +263,14 @@ class WifiDirectManager(private val context: Context, private val channel: Metho
                                 channel.invokeMethod(
                                     "onPeerDiscovered",
                                     mapOf(
-                                        "id" to device.deviceAddress,
+                                        "id" to "WIFI:${device.deviceAddress}",
+                                        "nodeId" to "WIFI:${device.deviceAddress}",
+                                        "address" to device.deviceAddress,
                                         "name" to device.deviceName,
                                         "transport" to "Wi-Fi Direct",
-                                        "signal" to device.status
+                                        "signal" to device.status,
+                                        "connectionState" to "discovered",
+                                        "connected" to false,
                                     )
                                 )
                             }
@@ -246,5 +297,36 @@ class WifiDirectManager(private val context: Context, private val channel: Metho
 
         return locationGranted &&
             context.checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun notifyStatus(state: String, message: String) {
+        mainHandler.post {
+            channel.invokeMethod("onStatus", mapOf(
+                "transport" to "Wi-Fi Direct",
+                "state" to state,
+                "message" to message,
+                "nodeId" to identity.nodeId,
+            ))
+        }
+    }
+
+    private fun notifyPeer(
+        nodeId: String,
+        address: String,
+        name: String,
+        state: String,
+        connected: Boolean,
+    ) {
+        mainHandler.post {
+            channel.invokeMethod("onPeerDiscovered", mapOf(
+                "id" to nodeId,
+                "nodeId" to nodeId,
+                "address" to address,
+                "name" to name,
+                "transport" to "Wi-Fi Direct",
+                "connectionState" to state,
+                "connected" to connected,
+            ))
+        }
     }
 }
