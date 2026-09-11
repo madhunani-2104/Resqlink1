@@ -379,6 +379,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         fileName: picked.name,
         mimeType: picked.mimeType,
         fileSize: picked.size,
+        bytes: picked.bytes,
       );
     } catch (e) {
       debugPrint('FILE SEND ERROR: $e');
@@ -514,13 +515,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // ============================================================
 
   Widget _buildFileBubble(ChatAttachment attachment) {
+    final chatProvider = Provider.of<MeshChatProvider>(context);
+    final progress = attachment.transferId == null
+        ? 1.0
+        : chatProvider.fileTransferProgress(attachment.transferId!);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.insert_drive_file_rounded, color: Colors.white),
+            Icon(_fileIcon(attachment.mimeType), color: Colors.white),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
@@ -535,9 +541,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         ),
         const SizedBox(height: 5),
         Text(
-          _formatFileSize(attachment.fileSize),
+          '${attachment.mimeType} • ${_formatFileSize(attachment.fileSize)}',
           style: const TextStyle(color: Colors.white70, fontSize: 11),
         ),
+        if (progress < 1) ...[
+          const SizedBox(height: 6),
+          LinearProgressIndicator(
+            value: progress,
+            backgroundColor: Colors.white24,
+            color: AppColors.primary,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Transferring ${(progress * 100).round()}%',
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
+        ],
         const SizedBox(height: 5),
         OutlinedButton.icon(
           onPressed: () => _openAttachment(attachment),
@@ -547,6 +566,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         ),
       ],
     );
+  }
+
+  IconData _fileIcon(String mimeType) {
+    if (mimeType.startsWith('image/')) return Icons.image_rounded;
+    if (mimeType.startsWith('audio/')) return Icons.audio_file_rounded;
+    if (mimeType.startsWith('video/')) return Icons.video_file_rounded;
+    if (mimeType == 'application/pdf') return Icons.picture_as_pdf_rounded;
+    if (mimeType.contains('zip') || mimeType.contains('compressed')) {
+      return Icons.folder_zip_rounded;
+    }
+    if (mimeType.startsWith('text/')) return Icons.description_rounded;
+    return Icons.insert_drive_file_rounded;
   }
 
   // ============================================================

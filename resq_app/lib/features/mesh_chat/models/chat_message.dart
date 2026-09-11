@@ -13,6 +13,8 @@ class ChatAttachment {
   final int fileSize;
   final String downloadPath;
   final String? inlineBase64;
+  final String? transferId;
+  final String transferState;
 
   const ChatAttachment({
     required this.fileId,
@@ -21,6 +23,8 @@ class ChatAttachment {
     required this.fileSize,
     required this.downloadPath,
     this.inlineBase64,
+    this.transferId,
+    this.transferState = 'available',
   });
 
   static ChatAttachment? fromContent(String content) {
@@ -59,10 +63,7 @@ class ChatAttachment {
       if (rawFileSize is num) {
         fileSize = rawFileSize.toInt();
       } else if (rawFileSize != null) {
-        fileSize = int.tryParse(
-              rawFileSize.toString(),
-            ) ??
-            0;
+        fileSize = int.tryParse(rawFileSize.toString()) ?? 0;
       }
 
       return ChatAttachment(
@@ -72,6 +73,8 @@ class ChatAttachment {
         fileSize: fileSize,
         downloadPath: data['downloadPath']?.toString() ?? '',
         inlineBase64: data['inlineBase64']?.toString(),
+        transferId: data['transferId']?.toString(),
+        transferState: data['transferState']?.toString() ?? 'available',
       );
     } catch (_) {
       return null;
@@ -95,9 +98,7 @@ class ChatVoiceMessage {
   });
 
   Duration get duration {
-    return Duration(
-      milliseconds: durationMs,
-    );
+    return Duration(milliseconds: durationMs);
   }
 
   String get formattedDuration {
@@ -112,9 +113,7 @@ class ChatVoiceMessage {
   // Extract JSON voice information
   // ----------------------------------------------------------
 
-  static ChatVoiceMessage? _fromJsonString(
-    String value,
-  ) {
+  static ChatVoiceMessage? _fromJsonString(String value) {
     try {
       final decoded = jsonDecode(value);
 
@@ -124,7 +123,8 @@ class ChatVoiceMessage {
 
       final data = Map<String, dynamic>.from(decoded);
 
-      final audio = data['audio']?.toString() ??
+      final audio =
+          data['audio']?.toString() ??
           data['base64Audio']?.toString() ??
           data['data']?.toString() ??
           '';
@@ -140,10 +140,7 @@ class ChatVoiceMessage {
       if (rawDuration is num) {
         durationMs = rawDuration.toInt();
       } else if (rawDuration != null) {
-        durationMs = int.tryParse(
-              rawDuration.toString(),
-            ) ??
-            0;
+        durationMs = int.tryParse(rawDuration.toString()) ?? 0;
       }
 
       return ChatVoiceMessage(
@@ -160,9 +157,7 @@ class ChatVoiceMessage {
   // Parse voice content
   // ----------------------------------------------------------
 
-  static ChatVoiceMessage? fromContent(
-    String content,
-  ) {
+  static ChatVoiceMessage? fromContent(String content) {
     const prefix = 'VOICE_MESSAGE_BASE64:';
 
     if (!content.startsWith(prefix)) {
@@ -198,14 +193,9 @@ class ChatVoiceMessage {
       try {
         final decodedBytes = base64Decode(raw);
 
-        final decodedString = utf8.decode(
-          decodedBytes,
-          allowMalformed: true,
-        );
+        final decodedString = utf8.decode(decodedBytes, allowMalformed: true);
 
-        final decodedJson = _fromJsonString(
-          decodedString,
-        );
+        final decodedJson = _fromJsonString(decodedString);
 
         if (decodedJson != null) {
           return decodedJson;
@@ -268,17 +258,10 @@ class ChatMessage {
     this.voiceMessage,
   });
 
-  factory ChatMessage.fromMeshPacket(
-    MeshPacket packet,
-    String currentUserId,
-  ) {
-    final attachment = ChatAttachment.fromContent(
-      packet.content,
-    );
+  factory ChatMessage.fromMeshPacket(MeshPacket packet, String currentUserId) {
+    final attachment = ChatAttachment.fromContent(packet.content);
 
-    final voiceMessage = ChatVoiceMessage.fromContent(
-      packet.content,
-    );
+    final voiceMessage = ChatVoiceMessage.fromContent(packet.content);
 
     return ChatMessage(
       packetId: packet.packetId,

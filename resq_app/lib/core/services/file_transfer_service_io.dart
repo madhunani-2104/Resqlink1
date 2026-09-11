@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
+
 import '../network/dio_client.dart';
 import '../constants/api_endpoints.dart';
 import '../utils/logger.dart';
@@ -25,7 +27,10 @@ class FileUploadResult {
 class FileTransferService {
   final DioClient _dioClient = DioClient();
 
-  Future<FileUploadResult?> upload({required String path, required String receiverId}) async {
+  Future<FileUploadResult?> upload({
+    required String path,
+    required String receiverId,
+  }) async {
     try {
       final file = File(path);
       if (!await file.exists()) return null;
@@ -34,16 +39,21 @@ class FileTransferService {
         ApiEndpoints.uploadMeshFile,
         data: FormData.fromMap({
           'receiverId': receiverId,
-          'file': await MultipartFile.fromFile(path, filename: path.split(Platform.pathSeparator).last),
+          'file': await MultipartFile.fromFile(
+            path,
+            filename: path.split(Platform.pathSeparator).last,
+          ),
         }),
         options: Options(contentType: 'multipart/form-data'),
       );
 
-      if (response.data is! Map || response.data['success'] != true) return null;
+      if (response.data is! Map || response.data['success'] != true)
+        return null;
       final data = Map<String, dynamic>.from(response.data['data'] as Map);
       return FileUploadResult(
         fileId: data['fileId']?.toString() ?? '',
-        name: data['name']?.toString() ?? path.split(Platform.pathSeparator).last,
+        name:
+            data['name']?.toString() ?? path.split(Platform.pathSeparator).last,
         mimeType: data['mimeType']?.toString() ?? 'application/octet-stream',
         size: (data['size'] as num?)?.toInt() ?? await file.length(),
         downloadPath: data['downloadPath']?.toString() ?? '',
@@ -66,11 +76,29 @@ class FileTransferService {
     }
   }
 
+  Future<List<int>?> readBytes(String path, {int maxBytes = 5242880}) async {
+    try {
+      final file = File(path);
+      if (!await file.exists()) return null;
+      final size = await file.length();
+      if (size <= 0 || size > maxBytes) return null;
+      return file.readAsBytes();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<String?> writeInlineBase64(String base64Data, String fileName) async {
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final safeName = fileName.replaceAll(RegExp(r'[\/:*?"<>|]'), '_');
-      final output = File('${directory.path}/$safeName');
+      final safeName = fileName
+          .replaceAll('\\', '/')
+          .split('/')
+          .last
+          .replaceAll(RegExp(r'[^A-Za-z0-9._ -]'), '_');
+      final output = File(
+        '${directory.path}/${DateTime.now().microsecondsSinceEpoch}_$safeName',
+      );
       await output.writeAsBytes(base64Decode(base64Data));
       return output.path;
     } catch (_) {
@@ -78,7 +106,10 @@ class FileTransferService {
     }
   }
 
-  Future<String?> download({required String fileId, required String fileName}) async {
+  Future<String?> download({
+    required String fileId,
+    required String fileName,
+  }) async {
     try {
       final directory = await getApplicationDocumentsDirectory();
       final safeName = fileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
