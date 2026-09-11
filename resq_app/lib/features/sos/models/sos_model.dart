@@ -1,6 +1,8 @@
 class SosModel {
   final String id;
   final String sosId;
+  final String eventId;
+  final String messageId;
   final String userId;
   final String userName;
   final String userPhone;
@@ -23,6 +25,8 @@ class SosModel {
   SosModel({
     this.id = '',
     required this.sosId,
+    String? eventId,
+    String? messageId,
     required this.userId,
     required this.userName,
     required this.userPhone,
@@ -41,21 +45,31 @@ class SosModel {
     this.isMeshRelayed = false,
     this.relayHops = 0,
     DateTime? createdAt,
-  }) : createdAt = createdAt ?? DateTime.now();
+  }) : eventId = eventId ?? sosId,
+       messageId = messageId ?? eventId ?? sosId,
+       createdAt = createdAt ?? DateTime.now();
 
   factory SosModel.fromJson(Map<String, dynamic> json) {
     return SosModel(
       id: json['_id'] ?? json['id'] ?? '',
       sosId: json['sosId'] ?? '',
-      userId: json['userId'] is Map ? json['userId']['_id'] : (json['userId'] ?? ''),
+      eventId: json['eventId']?.toString(),
+      messageId: json['messageId']?.toString(),
+      userId: json['userId'] is Map
+          ? json['userId']['_id']
+          : (json['userId'] ?? ''),
       userName: json['userName'] ?? 'Victim',
       userPhone: json['userPhone'] ?? '',
       latitude: json['location'] != null
           ? (json['location']['latitude'] as num).toDouble()
-          : (json['latitude'] != null ? (json['latitude'] as num).toDouble() : 0.0),
+          : (json['latitude'] != null
+                ? (json['latitude'] as num).toDouble()
+                : 0.0),
       longitude: json['location'] != null
           ? (json['location']['longitude'] as num).toDouble()
-          : (json['longitude'] != null ? (json['longitude'] as num).toDouble() : 0.0),
+          : (json['longitude'] != null
+                ? (json['longitude'] as num).toDouble()
+                : 0.0),
       altitude: json['location'] != null
           ? (json['location']['altitude'] as num? ?? 0.0).toDouble()
           : (json['altitude'] as num? ?? 0.0).toDouble(),
@@ -68,13 +82,16 @@ class SosModel {
       riskLevel: json['riskLevel']?.toString(),
       riskScore: (json['riskScore'] as num?)?.toDouble(),
       riskReason: json['riskReason'] ?? '',
-      riskPredictedAt: json['riskPredictedAt'] != null ? DateTime.tryParse(json['riskPredictedAt'].toString()) : null,
+      riskPredictedAt: json['riskPredictedAt'] != null
+          ? DateTime.tryParse(json['riskPredictedAt'].toString())
+          : null,
       notes: json['notes'] ?? '',
-      isMeshRelayed: json['isMeshRelayed'] == 1 || json['isMeshRelayed'] == true,
+      isMeshRelayed:
+          json['isMeshRelayed'] == 1 || json['isMeshRelayed'] == true,
       relayHops: json['relayHops'] ?? 0,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 
@@ -82,6 +99,8 @@ class SosModel {
     return {
       '_id': id,
       'sosId': sosId,
+      'eventId': eventId,
+      'messageId': messageId,
       'userId': userId,
       'userName': userName,
       'userPhone': userPhone,

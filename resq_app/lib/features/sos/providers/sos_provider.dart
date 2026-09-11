@@ -24,6 +24,8 @@ class SosProvider extends ChangeNotifier {
 
   List<SosModel> _activeSosList = [];
 
+  final Set<String> _processedLiveEvents = {};
+
   bool _isLoading = false;
 
   final SosSocketService _socketService = SosSocketService();
@@ -56,12 +58,7 @@ class SosProvider extends ChangeNotifier {
     _newAlertSubscription ??= _socketService.onNewAlert.listen((data) {
       try {
         final alert = SosModel.fromJson(data);
-
-        _activeSosList.removeWhere((item) => item.sosId == alert.sosId);
-
-        _activeSosList.insert(0, alert);
-
-        notifyListeners();
+        _upsertLiveAlert(alert, eventType: 'new');
       } catch (e) {
         AppLogger.error(
           'Failed to process new SOS alert',
@@ -72,30 +69,7 @@ class SosProvider extends ChangeNotifier {
       }
     });
 
-    _statusSubscription ??= _socketService.onStatusUpdated.listen((data) {
-      try {
-        final alert = SosModel.fromJson(data);
-
-        final index = _activeSosList.indexWhere(
-          (item) => item.sosId == alert.sosId,
-        );
-
-        if (index >= 0) {
-          _activeSosList[index] = alert;
-        } else {
-          _activeSosList.insert(0, alert);
-        }
-
-        notifyListeners();
-      } catch (e) {
-        AppLogger.error(
-          'Failed to process SOS status update',
-          e,
-          null,
-          'SosProvider',
-        );
-      }
-    });
+    _listenForStatusUpdates();
 
     _rescueRefreshTimer ??= Timer.periodic(const Duration(seconds: 15), (_) {
       fetchActiveSosAlerts();
@@ -116,12 +90,7 @@ class SosProvider extends ChangeNotifier {
     _emergencySubscription ??= _socketService.onEmergencyAlert.listen((data) {
       try {
         final alert = SosModel.fromJson(data);
-
-        _activeSosList.removeWhere((item) => item.sosId == alert.sosId);
-
-        _activeSosList.insert(0, alert);
-
-        notifyListeners();
+        _upsertLiveAlert(alert, eventType: 'emergency');
       } catch (e) {
         AppLogger.error(
           'Failed to process emergency alert',
@@ -131,6 +100,53 @@ class SosProvider extends ChangeNotifier {
         );
       }
     });
+
+    _listenForStatusUpdates();
+  }
+
+  void _listenForStatusUpdates() {
+    _statusSubscription ??= _socketService.onStatusUpdated.listen((data) {
+      try {
+        final alert = SosModel.fromJson(data);
+        _upsertLiveAlert(alert, eventType: 'status');
+      } catch (e) {
+        AppLogger.error(
+          'Failed to process SOS status update',
+          e,
+          null,
+          'SosProvider',
+        );
+      }
+    });
+  }
+
+  void _upsertLiveAlert(SosModel alert, {required String eventType}) {
+    if (alert.sosId.trim().isEmpty) return;
+
+    final eventKey =
+        '${eventType}:${alert.eventId}:${alert.messageId}:${alert.status}';
+    if (!_processedLiveEvents.add(eventKey)) return;
+
+    if (_processedLiveEvents.length > 2000) {
+      _processedLiveEvents.remove(_processedLiveEvents.first);
+    }
+
+    final index = _activeSosList.indexWhere(
+      (item) => item.sosId == alert.sosId,
+    );
+
+    if (index >= 0) {
+      _activeSosList[index] = alert;
+    } else {
+      _activeSosList.insert(0, alert);
+    }
+
+    if (_activeSos?.sosId == alert.sosId) {
+      _activeSos = alert;
+      _isSosActive = alert.status == 'ACTIVE' || alert.status == 'ACKNOWLEDGED';
+    }
+
+    notifyListeners();
   }
 
   // ==============================================================
@@ -271,7 +287,11 @@ class SosProvider extends ChangeNotifier {
       }
 
       final String baseContent =
-          'EMERGENCY SOS BEACON: '
+          'EMERGENCY SOS BEACON\n'
+          'eventId=$sosId\n'
+          'messageId=PKT-$sosId\n'
+          'status=ACTIVE\n'
+          'timestamp=${DateTime.now().toIso8601String()}\n'
           'Victim $userName needs immediate assistance.\n'
           '$locationText';
 
