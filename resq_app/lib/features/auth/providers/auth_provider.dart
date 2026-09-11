@@ -155,7 +155,6 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String phone,
     required String password,
-    String role = 'user',
   }) async {
     _status = AuthStatus.authenticating;
     _errorMessage = null;
@@ -169,7 +168,7 @@ class AuthProvider extends ChangeNotifier {
           'email': email,
           'phone': phone,
           'password': password,
-          'role': role,
+          // 'role' intentionally NOT sent — backend always assigns 'user' for public registration
         },
       );
 
@@ -278,6 +277,39 @@ class AuthProvider extends ChangeNotifier {
       _errorMessage = _parseError(e);
       notifyListeners();
 
+      return false;
+    }
+  }
+
+  Future<bool> resetPassword(String email, String resetCode, String newPassword) async {
+    _status = AuthStatus.authenticating;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await _dioClient.instance.post(
+        ApiEndpoints.resetPassword,
+        data: {
+          'email': email,
+          'resetCode': resetCode,
+          'newPassword': newPassword,
+        },
+      );
+
+      if (response.data['success'] == true) {
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return true;
+      }
+
+      _errorMessage = response.data['message']?.toString() ?? 'Password reset failed';
+      _status = AuthStatus.error;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = _parseError(e);
+      _status = AuthStatus.error;
+      notifyListeners();
       return false;
     }
   }

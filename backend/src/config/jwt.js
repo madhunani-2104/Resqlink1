@@ -1,13 +1,19 @@
 const jwt = require('jsonwebtoken');
 
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'resq_emergency_secret_key_2026_jwt_token_btech_capstone', {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not defined in environment variables');
+  }
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE || '30d',
   });
 };
 
 const verifyToken = (token) => {
-  return jwt.verify(token, process.env.JWT_SECRET || 'resq_emergency_secret_key_2026_jwt_token_btech_capstone');
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not defined in environment variables');
+  }
+  return jwt.verify(token, process.env.JWT_SECRET);
 };
 
 module.exports = { generateToken, verifyToken };

@@ -1,7 +1,11 @@
 const User = require('../models/User');
 const { generateToken } = require('../config/jwt');
 
-const RESCUE_ACCESS_CODE = process.env.RESCUE_TEAM_ACCESS_CODE || 'RESQ-TEAM-2026';
+const RESCUE_ACCESS_CODE = process.env.RESCUE_TEAM_ACCESS_CODE;
+
+if (!RESCUE_ACCESS_CODE) {
+  console.error('[STARTUP ERROR] RESCUE_TEAM_ACCESS_CODE environment variable is not set.');
+}
 
 const formatAuthUser = (user) => ({
   _id: user._id,
@@ -39,7 +43,7 @@ const registerUser = async (req, res, next) => {
       email,
       phone,
       password,
-      role: role === 'admin' ? 'admin' : 'user',
+      role: 'user',
       meshId,
     });
 
@@ -154,10 +158,11 @@ const forgotPassword = async (req, res, next) => {
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
     await user.save();
 
+    // In production, send OTP via SMS/email. For dev: log to server console only.
+    console.log(`[DEV ONLY] Password reset OTP for ${email}: ${resetToken}`);
     res.json({
       success: true,
-      message: 'Password reset code sent (simulated OTP generated)',
-      resetCode: resetToken, // Returned for dev/testing ease
+      message: 'If this email is registered, a reset code has been sent.',
     });
   } catch (error) {
     next(error);

@@ -18,17 +18,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _selectedRole = 'user';
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   void _submitRegister() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      // Note: role is NOT sent — backend always creates 'user' for normal registration.
       final success = await authProvider.register(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         phone: _phoneController.text.trim(),
         password: _passwordController.text.trim(),
-        role: _selectedRole,
       );
 
       if (success && mounted) {
@@ -95,21 +104,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _passwordController,
                   labelText: 'Password',
                   prefixIcon: Icons.lock_outline,
-                  obscureText: true,
-                  validator: (val) => val != null && val.length >= 6 ? null : 'Min 6 characters',
-                ),
-                const SizedBox(height: 20),
-                DropdownButtonFormField<String>(
-                  value: _selectedRole,
-                  decoration: const InputDecoration(
-                    labelText: 'Account Role',
-                    prefixIcon: Icon(Icons.badge_outlined),
+                  obscureText: _obscurePassword,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'user', child: Text('Civilian / Victim')),
-                    DropdownMenuItem(value: 'admin', child: Text('Disaster Response Admin')),
-                  ],
-                  onChanged: (val) => setState(() => _selectedRole = val!),
+                  validator: (val) => val != null && val.length >= 6 ? null : 'Min 6 characters',
                 ),
                 const SizedBox(height: 30),
                 CustomButton(

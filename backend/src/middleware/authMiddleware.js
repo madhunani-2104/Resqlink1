@@ -12,7 +12,7 @@ const protect = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(
         token,
-        process.env.JWT_SECRET || 'resq_emergency_secret_key_2026_jwt_token_btech_capstone'
+        process.env.JWT_SECRET
       );
 
       req.user = await User.findById(decoded.id).select('-password');
