@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+
+import 'dart:typed_data';
 
 import '../constants/app_constants.dart';
 import '../utils/logger.dart';
@@ -9,12 +12,14 @@ class PickedFileInfo {
   final String name;
   final String mimeType;
   final int size;
+  final Uint8List? bytes;
 
   const PickedFileInfo({
     required this.path,
     required this.name,
     required this.mimeType,
     required this.size,
+    this.bytes,
   });
 }
 
@@ -28,28 +33,18 @@ class FileAccessService {
   // ============================================================
 
   static Future<PickedFileInfo?> pickFile() async {
-    if (kIsWeb) {
-      return null;
-    }
-
     try {
-      final raw = await _channel.invokeMethod<dynamic>('pickFile');
+      final file = await FilePicker.pickFile(type: FileType.any);
 
-      if (raw == null) {
+      if (file == null) {
         return null;
       }
 
-      if (raw is! Map) {
-        AppLogger.warning('Invalid file picker response.', 'FileAccessService');
-        return null;
-      }
+      final name = _safeFileName(file.name);
+      final path = file.path?.trim() ?? '';
+      final bytes = kIsWeb ? await file.readAsBytes() : null;
 
-      final data = Map<String, dynamic>.from(raw);
-
-      final path = data['path']?.toString().trim() ?? '';
-      final name = data['name']?.toString().trim() ?? '';
-
-      if (path.isEmpty || name.isEmpty) {
+      if (name.isEmpty || (path.isEmpty && (bytes == null || bytes.isEmpty))) {
         AppLogger.warning(
           'File picker returned an invalid file.',
           'FileAccessService',
@@ -57,24 +52,16 @@ class FileAccessService {
         return null;
       }
 
-      final mimeType =
-          data['mimeType']?.toString().trim() ?? 'application/octet-stream';
-
-      final dynamic rawSize = data['size'];
-
-      int size = 0;
-
-      if (rawSize is num) {
-        size = rawSize.toInt();
-      } else if (rawSize != null) {
-        size = int.tryParse(rawSize.toString()) ?? 0;
-      }
+      final extension = file.extension?.toLowerCase();
+      final mimeType = _mimeTypeFor(extension);
+      final size = bytes?.length ?? await file.length();
 
       return PickedFileInfo(
         path: path,
         name: name,
-        mimeType: mimeType.isEmpty ? 'application/octet-stream' : mimeType,
+        mimeType: mimeType,
         size: size,
+        bytes: bytes,
       );
     } on PlatformException catch (e) {
       AppLogger.warning(
@@ -122,5 +109,29 @@ class FileAccessService {
 
       return false;
     }
+  }
+
+  static String _safeFileName(String value) {
+    final leaf = value.replaceAll('\\', '/').split('/').last.trim();
+    return leaf.replaceAll(RegExp(r'[^A-Za-z0-9._ -]'), '_');
+  }
+
+  static String _mimeTypeFor(String? extension) {
+    const known = <String, String>{
+      'pdf': 'application/pdf',
+      'txt': 'text/plain',
+      'csv': 'text/csv',
+      'json': 'application/json',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'mp3': 'audio/mpeg',
+      'm4a': 'audio/mp4',
+      'wav': 'audio/wav',
+      'mp4': 'video/mp4',
+      'zip': 'application/zip',
+    };
+    return known[extension] ?? 'application/octet-stream';
   }
 }

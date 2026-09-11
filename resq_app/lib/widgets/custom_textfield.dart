@@ -7,6 +7,7 @@ class CustomTextField extends StatelessWidget {
   final IconData? prefixIcon;
   final Widget? suffixIcon;
   final bool obscureText;
+  final bool enabled;
   final TextInputType keyboardType;
   final String? Function(String?)? validator;
   final int maxLines;
@@ -19,6 +20,7 @@ class CustomTextField extends StatelessWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.obscureText = false,
+    this.enabled = true,
     this.keyboardType = TextInputType.text,
     this.validator,
     this.maxLines = 1,
@@ -29,6 +31,7 @@ class CustomTextField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
+      enabled: enabled,
       keyboardType: keyboardType,
       maxLines: maxLines,
       validator: validator,
@@ -38,7 +41,10 @@ class CustomTextField extends StatelessWidget {
         hintText: hintText,
         prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
         suffixIcon: suffixIcon,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
       ),
     );
   }
