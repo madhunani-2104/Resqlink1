@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const SosAlertSchema = new mongoose.Schema(
   {
     sosId: { type: String, required: true, unique: true },
+    eventId: { type: String, unique: true, sparse: true },
+    messageId: { type: String, unique: true, sparse: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     userName: { type: String, required: true },
     userPhone: { type: String, required: true },

@@ -3,6 +3,23 @@ const User = require('../models/User');
 const HelpReward = require('../models/HelpReward');
 const { predictEmergencyRisk } = require('../utils/riskPredictor');
 
+const emitSosStatus = (io, alert) => {
+  if (!io || !alert) return;
+
+  const payload = alert.toObject ? alert.toObject() : alert;
+  const victimId = alert.userId?._id || alert.userId;
+
+  io.to('rescue_team').emit('sos_status_updated', payload);
+  io.to('admin').emit('sos_status_updated', payload);
+
+  if (victimId) {
+    io.to(`user:${victimId.toString()}`).emit(
+      'sos_status_updated',
+      payload,
+    );
+  }
+};
+
 const findSosAlertByParam = async (idOrSosId) => {
   const query = idOrSosId.match(/^[0-9a-fA-F]{24}$/)
     ? {
@@ -27,6 +44,8 @@ const createSosAlert = async (req, res, next) => {
   try {
     const {
       sosId,
+      eventId,
+      messageId,
       latitude,
       longitude,
       altitude,
@@ -97,13 +116,20 @@ const createSosAlert = async (req, res, next) => {
         Math.random() * 1000,
       )}`;
 
+    const generatedEventId = eventId || generatedSosId;
+    const generatedMessageId = messageId || generatedEventId;
+
     // ----------------------------------------------------------
     // Prevent duplicate SOS
     // ----------------------------------------------------------
 
     const existingAlert =
       await SosAlert.findOne({
-        sosId: generatedSosId,
+        $or: [
+          { sosId: generatedSosId },
+          { eventId: generatedEventId },
+          { messageId: generatedMessageId },
+        ],
       });
 
     if (existingAlert) {
@@ -133,6 +159,10 @@ const createSosAlert = async (req, res, next) => {
 
     const sosAlert = await SosAlert.create({
       sosId: generatedSosId,
+
+      eventId: generatedEventId,
+
+      messageId: generatedMessageId,
 
       userId: user._id,
 
@@ -356,17 +386,7 @@ const acknowledgeSosAlert = async (
     const io =
       req.app.get('socketio');
 
-    if (io) {
-      io.to('rescue_team').emit(
-        'sos_status_updated',
-        alert,
-      );
-
-      io.to('admin').emit(
-        'sos_status_updated',
-        alert,
-      );
-    }
+    emitSosStatus(io, alert);
 
     return res.json({
       success: true,
@@ -513,16 +533,7 @@ const resolveSosAlert = async (
       req.app.get('socketio');
 
     if (io) {
-      io.to('rescue_team').emit(
-        'sos_status_updated',
-        alert,
-      );
-
-      io.to('admin').emit(
-        'sos_status_updated',
-        alert,
-      );
-
+      emitSosStatus(io, alert);
       io.to(
         `user:${helperId.toString()}`,
       ).emit(
@@ -629,17 +640,7 @@ const cancelSosAlert = async (
     const io =
       req.app.get('socketio');
 
-    if (io) {
-      io.to('rescue_team').emit(
-        'sos_status_updated',
-        alert,
-      );
-
-      io.to('admin').emit(
-        'sos_status_updated',
-        alert,
-      );
-    }
+    emitSosStatus(io, alert);
 
     return res.json({
       success: true,
