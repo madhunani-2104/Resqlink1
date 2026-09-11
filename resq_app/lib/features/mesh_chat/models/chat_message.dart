@@ -59,10 +59,7 @@ class ChatAttachment {
       if (rawFileSize is num) {
         fileSize = rawFileSize.toInt();
       } else if (rawFileSize != null) {
-        fileSize = int.tryParse(
-              rawFileSize.toString(),
-            ) ??
-            0;
+        fileSize = int.tryParse(rawFileSize.toString()) ?? 0;
       }
 
       return ChatAttachment(
@@ -87,17 +84,23 @@ class ChatVoiceMessage {
   final String base64Audio;
   final int durationMs;
   final String mimeType;
+  final String? messageId;
+  final String? senderNodeId;
+  final DateTime? sentAt;
+  final String? fileName;
 
   const ChatVoiceMessage({
     required this.base64Audio,
     required this.durationMs,
     this.mimeType = 'audio/m4a',
+    this.messageId,
+    this.senderNodeId,
+    this.sentAt,
+    this.fileName,
   });
 
   Duration get duration {
-    return Duration(
-      milliseconds: durationMs,
-    );
+    return Duration(milliseconds: durationMs);
   }
 
   String get formattedDuration {
@@ -112,9 +115,7 @@ class ChatVoiceMessage {
   // Extract JSON voice information
   // ----------------------------------------------------------
 
-  static ChatVoiceMessage? _fromJsonString(
-    String value,
-  ) {
+  static ChatVoiceMessage? _fromJsonString(String value) {
     try {
       final decoded = jsonDecode(value);
 
@@ -124,7 +125,8 @@ class ChatVoiceMessage {
 
       final data = Map<String, dynamic>.from(decoded);
 
-      final audio = data['audio']?.toString() ??
+      final audio =
+          data['audio']?.toString() ??
           data['base64Audio']?.toString() ??
           data['data']?.toString() ??
           '';
@@ -140,16 +142,17 @@ class ChatVoiceMessage {
       if (rawDuration is num) {
         durationMs = rawDuration.toInt();
       } else if (rawDuration != null) {
-        durationMs = int.tryParse(
-              rawDuration.toString(),
-            ) ??
-            0;
+        durationMs = int.tryParse(rawDuration.toString()) ?? 0;
       }
 
       return ChatVoiceMessage(
         base64Audio: audio,
         durationMs: durationMs,
         mimeType: data['mimeType']?.toString() ?? 'audio/m4a',
+        messageId: data['messageId']?.toString(),
+        senderNodeId: data['senderNodeId']?.toString(),
+        sentAt: DateTime.tryParse(data['timestamp']?.toString() ?? ''),
+        fileName: data['fileName']?.toString(),
       );
     } catch (_) {
       return null;
@@ -160,9 +163,7 @@ class ChatVoiceMessage {
   // Parse voice content
   // ----------------------------------------------------------
 
-  static ChatVoiceMessage? fromContent(
-    String content,
-  ) {
+  static ChatVoiceMessage? fromContent(String content) {
     const prefix = 'VOICE_MESSAGE_BASE64:';
 
     if (!content.startsWith(prefix)) {
@@ -198,14 +199,9 @@ class ChatVoiceMessage {
       try {
         final decodedBytes = base64Decode(raw);
 
-        final decodedString = utf8.decode(
-          decodedBytes,
-          allowMalformed: true,
-        );
+        final decodedString = utf8.decode(decodedBytes, allowMalformed: true);
 
-        final decodedJson = _fromJsonString(
-          decodedString,
-        );
+        final decodedJson = _fromJsonString(decodedString);
 
         if (decodedJson != null) {
           return decodedJson;
@@ -268,17 +264,10 @@ class ChatMessage {
     this.voiceMessage,
   });
 
-  factory ChatMessage.fromMeshPacket(
-    MeshPacket packet,
-    String currentUserId,
-  ) {
-    final attachment = ChatAttachment.fromContent(
-      packet.content,
-    );
+  factory ChatMessage.fromMeshPacket(MeshPacket packet, String currentUserId) {
+    final attachment = ChatAttachment.fromContent(packet.content);
 
-    final voiceMessage = ChatVoiceMessage.fromContent(
-      packet.content,
-    );
+    final voiceMessage = ChatVoiceMessage.fromContent(packet.content);
 
     return ChatMessage(
       packetId: packet.packetId,

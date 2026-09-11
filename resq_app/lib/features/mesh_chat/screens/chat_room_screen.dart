@@ -52,6 +52,43 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   String? _playingMessageId;
 
+  Duration _playbackPosition = Duration.zero;
+
+  Duration _playbackDuration = Duration.zero;
+
+  StreamSubscription<Duration>? _playbackPositionSubscription;
+
+  StreamSubscription<Duration>? _playbackDurationSubscription;
+
+  StreamSubscription<void>? _playbackCompleteSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _playbackPositionSubscription = VoiceRecordingService.playbackPositionStream
+        .listen((position) {
+          if (!mounted) return;
+          setState(() => _playbackPosition = position);
+        });
+
+    _playbackDurationSubscription = VoiceRecordingService.playbackDurationStream
+        .listen((duration) {
+          if (!mounted) return;
+          setState(() => _playbackDuration = duration);
+        });
+
+    _playbackCompleteSubscription = VoiceRecordingService.playbackCompleteStream
+        .listen((_) {
+          if (!mounted) return;
+          setState(() {
+            _playingMessageId = null;
+            _playbackPosition = Duration.zero;
+            _playbackDuration = Duration.zero;
+          });
+        });
+  }
+
   // ============================================================
   // FORMAT DURATION
   // ============================================================
@@ -408,6 +445,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       if (mounted) {
         setState(() {
           _playingMessageId = null;
+          _playbackPosition = Duration.zero;
+          _playbackDuration = Duration.zero;
         });
       }
 
@@ -419,6 +458,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (mounted) {
       setState(() {
         _playingMessageId = null;
+        _playbackPosition = Duration.zero;
+        _playbackDuration = Duration.zero;
       });
     }
 
@@ -441,6 +482,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     setState(() {
       _playingMessageId = messageId;
+      _playbackPosition = Duration.zero;
+      _playbackDuration = Duration.zero;
     });
   }
 
@@ -455,6 +498,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final isPlaying = _playingMessageId == messageId;
 
     final duration = voice.durationMs > 0 ? voice.formattedDuration : 'Voice';
+    final maxMillis = _playbackDuration.inMilliseconds > 0
+        ? _playbackDuration.inMilliseconds
+        : voice.durationMs;
+    final progress = maxMillis > 0
+        ? (_playbackPosition.inMilliseconds / maxMillis).clamp(0.0, 1.0)
+        : 0.0;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -477,11 +526,29 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           ),
           const Icon(Icons.mic_rounded, color: Colors.white70, size: 20),
           const SizedBox(width: 8),
-          Text(
-            duration,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                LinearProgressIndicator(
+                  value: isPlaying ? progress : 0,
+                  minHeight: 3,
+                  backgroundColor: Colors.white24,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isPlaying && _playbackPosition > Duration.zero
+                      ? '${VoiceRecordingService.formatDuration(_playbackPosition)} / $duration'
+                      : duration,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -927,6 +994,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   @override
   void dispose() {
+    _playbackPositionSubscription?.cancel();
+    _playbackDurationSubscription?.cancel();
+    _playbackCompleteSubscription?.cancel();
     _recordingTimer?.cancel();
 
     if (_isRecording) {
