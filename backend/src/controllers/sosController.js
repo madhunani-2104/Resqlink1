@@ -25,10 +25,16 @@ const findSosAlertByParam = async (idOrSosId) => {
 
 const createSosAlert = async (req, res, next) => {
   try {
+    const rawLocation = req.body?.location || {};
+    const parsedLatitude = Number(
+      req.body?.latitude ?? rawLocation.latitude ?? 0,
+    );
+    const parsedLongitude = Number(
+      req.body?.longitude ?? rawLocation.longitude ?? 0,
+    );
+
     const {
       sosId,
-      latitude,
-      longitude,
       altitude,
       accuracy,
       address,
@@ -39,6 +45,9 @@ const createSosAlert = async (req, res, next) => {
       relayHops,
       meshRelayNodes,
     } = req.body;
+
+    const latitude = Number.isFinite(parsedLatitude) ? parsedLatitude : null;
+    const longitude = Number.isFinite(parsedLongitude) ? parsedLongitude : null;
 
     const user = await User.findById(req.user._id);
 
@@ -274,7 +283,11 @@ const createSosAlert = async (req, res, next) => {
 
     return res.status(201).json({
       success: true,
-      data: sosAlert,
+      data: {
+        ...sosAlert.toObject(),
+        latitude: sosAlert.location.latitude,
+        longitude: sosAlert.location.longitude,
+      },
     });
   } catch (error) {
     next(error);

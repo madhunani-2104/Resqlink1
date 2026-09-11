@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
+
 import '../models/map_models.dart';
 import '../../sos/models/sos_model.dart';
 import '../../../core/network/dio_client.dart';
@@ -10,7 +11,7 @@ import '../../../core/utils/logger.dart';
 class MapProvider extends ChangeNotifier {
   final DioClient _dioClient = DioClient();
 
-  LatLng _currentLocation = const LatLng(40.730610, -73.935242);
+  LatLng _currentLocation = const LatLng(0.0, 0.0);
   List<SafeZoneModel> _safeZones = [];
   List<ShelterModel> _shelters = [];
   List<SosModel> _victims = [];
@@ -35,6 +36,10 @@ class MapProvider extends ChangeNotifier {
   }
 
   Future<void> initLocationAndLayers() async {
+    await refreshLocationAndLayers();
+  }
+
+  Future<void> refreshLocationAndLayers() async {
     _isLoading = true;
     notifyListeners();
 
@@ -46,8 +51,15 @@ class MapProvider extends ChangeNotifier {
 
       await fetchMapLayers();
     } catch (e) {
-      AppLogger.error('Failed to init location/map layers', e, null, 'MapProvider');
-      _loadDummyOfflineData();
+      AppLogger.error(
+        'Failed to refresh location and map layers',
+        e,
+        null,
+        'MapProvider',
+      );
+      _safeZones = [];
+      _shelters = [];
+      _victims = [];
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -59,80 +71,29 @@ class MapProvider extends ChangeNotifier {
       final response = await _dioClient.instance.get(ApiEndpoints.mapLayers);
       if (response.data['success'] == true) {
         final data = response.data['data'];
-        _safeZones = (data['safeZones'] as List)
+        _safeZones = (data['safeZones'] as List? ?? [])
             .map((item) => SafeZoneModel.fromJson(item))
             .toList();
-        _shelters = (data['shelters'] as List)
+        _shelters = (data['shelters'] as List? ?? [])
             .map((item) => ShelterModel.fromJson(item))
             .toList();
-        _victims = (data['victims'] as List)
+        _victims = (data['victims'] as List? ?? [])
             .map((item) => SosModel.fromJson(item))
             .toList();
+      } else {
+        _safeZones = [];
+        _shelters = [];
+        _victims = [];
       }
     } catch (e) {
-      AppLogger.warning('Map layers API unavailable, loading offline GIS layers', 'MapProvider');
-      _loadDummyOfflineData();
+      AppLogger.warning(
+        'Map layers API unavailable; using live GPS without fabricated map data',
+        'MapProvider',
+      );
+      _safeZones = [];
+      _shelters = [];
+      _victims = [];
     }
-  }
-
-  void _loadDummyOfflineData() {
-    _safeZones = [
-      SafeZoneModel(
-        id: 'SZ-101',
-        name: 'Central Assembly Safe Haven',
-        description: 'High ground assembly area with medical personnel',
-        latitude: _currentLocation.latitude + 0.005,
-        longitude: _currentLocation.longitude + 0.005,
-        radiusMeters: 400,
-        status: 'OPEN',
-      ),
-      SafeZoneModel(
-        id: 'SZ-102',
-        name: 'East Stadium Safe Zone',
-        description: 'Flood relief shelter and helipad',
-        latitude: _currentLocation.latitude - 0.008,
-        longitude: _currentLocation.longitude + 0.003,
-        radiusMeters: 600,
-        status: 'OPEN',
-      ),
-    ];
-
-    _shelters = [
-      ShelterModel(
-        id: 'SH-201',
-        name: 'St. Mary Disaster Relief Shelter',
-        address: '124 Emergency Way, Sector 4',
-        latitude: _currentLocation.latitude + 0.003,
-        longitude: _currentLocation.longitude - 0.006,
-        capacity: 350,
-        currentOccupants: 120,
-        amenities: ['Food', 'Water', 'Medical', 'Power Generators'],
-      ),
-      ShelterModel(
-        id: 'SH-202',
-        name: 'Civic Community Shelter',
-        address: '89 North Ave',
-        latitude: _currentLocation.latitude - 0.004,
-        longitude: _currentLocation.longitude - 0.004,
-        capacity: 200,
-        currentOccupants: 180,
-        amenities: ['Food', 'Beds', 'First Aid'],
-      ),
-    ];
-
-    _victims = [
-      SosModel(
-        sosId: 'SOS-V1',
-        userId: 'U1',
-        userName: 'John Doe',
-        userPhone: '+1987654321',
-        latitude: _currentLocation.latitude + 0.002,
-        longitude: _currentLocation.longitude + 0.002,
-        severity: 'CRITICAL',
-        status: 'ACTIVE',
-        notes: 'Trapped in building ground floor due to rising water.',
-      ),
-    ];
   }
 
   void toggleSafeZones(bool val) {

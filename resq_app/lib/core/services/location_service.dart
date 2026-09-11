@@ -1,11 +1,21 @@
 import 'package:geolocator/geolocator.dart';
+
 import '../utils/logger.dart';
+
+enum LocationRequestStatus {
+  success,
+  serviceDisabled,
+  permissionDenied,
+  permissionPermanentlyDenied,
+  unavailable,
+}
 
 class LocationService {
   /// Request GPS permissions and fetch the device's current position.
   /// Returns null when location services/permissions are unavailable instead
   /// of fabricating coordinates.
-  static Future<Position?> getCurrentPosition() async {
+  static Future<({Position? position, LocationRequestStatus status})>
+  getCurrentPositionWithStatus() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -13,7 +23,7 @@ class LocationService {
           'Location services are disabled on device.',
           'LocationService',
         );
-        return null;
+        return (position: null, status: LocationRequestStatus.serviceDisabled);
       }
 
       var permission = await Geolocator.checkPermission();
@@ -22,11 +32,8 @@ class LocationService {
       }
 
       if (permission == LocationPermission.denied) {
-        AppLogger.warning(
-          'Location permission was denied.',
-          'LocationService',
-        );
-        return null;
+        AppLogger.warning('Location permission was denied.', 'LocationService');
+        return (position: null, status: LocationRequestStatus.permissionDenied);
       }
 
       if (permission == LocationPermission.deniedForever) {
@@ -34,25 +41,30 @@ class LocationService {
           'Location permission is permanently denied.',
           'LocationService',
         );
-        return null;
+        return (
+          position: null,
+          status: LocationRequestStatus.permissionPermanentlyDenied,
+        );
       }
 
-      return await Geolocator.getCurrentPosition(
+      final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.best,
         timeLimit: const Duration(seconds: 15),
       );
+
+      return (position: position, status: LocationRequestStatus.success);
     } on LocationServiceDisabledException {
       AppLogger.warning(
         'Location services became unavailable while reading GPS.',
         'LocationService',
       );
-      return null;
+      return (position: null, status: LocationRequestStatus.serviceDisabled);
     } on PermissionDeniedException {
       AppLogger.warning(
         'Location permission was denied while reading GPS.',
         'LocationService',
       );
-      return null;
+      return (position: null, status: LocationRequestStatus.permissionDenied);
     } catch (e) {
       AppLogger.error(
         'Error fetching current GPS position',
@@ -60,7 +72,12 @@ class LocationService {
         null,
         'LocationService',
       );
-      return null;
+      return (position: null, status: LocationRequestStatus.unavailable);
     }
+  }
+
+  static Future<Position?> getCurrentPosition() async {
+    final result = await getCurrentPositionWithStatus();
+    return result.position;
   }
 }
