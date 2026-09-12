@@ -123,4 +123,27 @@ class FileAccessService {
       return false;
     }
   }
+
+  static Future<bool> saveTextFile({
+    required String fileName,
+    required String content,
+  }) async {
+    if (kIsWeb || fileName.trim().isEmpty || content.isEmpty) {
+      return false;
+    }
+
+    try {
+      final result = await _channel.invokeMethod<dynamic>(
+        'saveFile',
+        <String, dynamic>{'fileName': fileName, 'content': content},
+      );
+      return result == true;
+    } on PlatformException catch (e) {
+      AppLogger.warning('File save failed: ${e.message}', 'FileAccessService');
+      return false;
+    } catch (e) {
+      AppLogger.warning('File save failed: $e', 'FileAccessService');
+      return false;
+    }
+  }
 }

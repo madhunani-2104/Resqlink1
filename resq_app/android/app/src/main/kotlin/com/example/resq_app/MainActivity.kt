@@ -41,11 +41,13 @@ class MainActivity : FlutterActivity() {
         private const val BLE_PERMISSION_REQUEST = 1001
         private const val WIFI_PERMISSION_REQUEST = 1002
         private const val FILE_PICKER_REQUEST = 5001
+        private const val FILE_SAVE_REQUEST = 5002
     }
 
     private lateinit var bleManager: BleMeshManager
     private lateinit var wifiManager: WifiDirectManager
     private var pendingFilePickerResult: MethodChannel.Result? = null
+    private var pendingFileSaveContent: String? = null
 
     override fun configureFlutterEngine(
         flutterEngine: FlutterEngine
@@ -444,6 +446,23 @@ class MainActivity : FlutterActivity() {
                     startActivityForResult(intent, FILE_PICKER_REQUEST)
                 }
 
+                "saveFile" -> {
+                    if (pendingFilePickerResult != null) {
+                        result.error("FILE_ACCESS_BUSY", "A file operation is already open", null)
+                        return@setMethodCallHandler
+                    }
+
+                    pendingFilePickerResult = result
+                    pendingFileSaveContent = call.argument<String>("content") ?: ""
+                    val fileName = call.argument<String>("fileName") ?: "resq_report.csv"
+                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "text/csv"
+                        putExtra(Intent.EXTRA_TITLE, fileName)
+                    }
+                    startActivityForResult(intent, FILE_SAVE_REQUEST)
+                }
+
                 "openFile" -> {
                     result.success(false)
                 }
@@ -616,6 +635,29 @@ class MainActivity : FlutterActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == FILE_SAVE_REQUEST) {
+            val result = pendingFilePickerResult ?: return
+            pendingFilePickerResult = null
+            val content = pendingFileSaveContent ?: ""
+            pendingFileSaveContent = null
+
+            if (resultCode != RESULT_OK || data?.data == null) {
+                result.success(false)
+                return
+            }
+
+            try {
+                contentResolver.openOutputStream(data.data!!).use { output ->
+                    if (output == null) throw IllegalStateException("Unable to open report destination")
+                    output.write(content.toByteArray(Charsets.UTF_8))
+                }
+                result.success(true)
+            } catch (error: Exception) {
+                result.error("FILE_SAVE_FAILED", error.message, null)
+            }
+            return
+        }
+
         if (requestCode != FILE_PICKER_REQUEST) return
 
         val result = pendingFilePickerResult ?: return
