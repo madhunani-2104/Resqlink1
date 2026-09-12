@@ -61,10 +61,7 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
       appBar: AppBar(
         title: const Text(
           'Rescue Team Field Command',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -81,35 +78,14 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
               });
             },
             itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: 'All',
-                child: Text('All Alerts'),
-              ),
-              PopupMenuItem(
-                value: 'CRITICAL',
-                child: Text('Critical'),
-              ),
-              PopupMenuItem(
-                value: 'HIGH',
-                child: Text('High'),
-              ),
-              PopupMenuItem(
-                value: 'MEDIUM',
-                child: Text('Medium'),
-              ),
-              PopupMenuItem(
-                value: 'LOW',
-                child: Text('Low'),
-              ),
-              PopupMenuItem(
-                value: 'ACKNOWLEDGED',
-                child: Text('Responding'),
-              ),
+              PopupMenuItem(value: 'All', child: Text('All Alerts')),
+              PopupMenuItem(value: 'CRITICAL', child: Text('Critical')),
+              PopupMenuItem(value: 'HIGH', child: Text('High')),
+              PopupMenuItem(value: 'MEDIUM', child: Text('Medium')),
+              PopupMenuItem(value: 'LOW', child: Text('Low')),
+              PopupMenuItem(value: 'ACKNOWLEDGED', child: Text('Responding')),
               PopupMenuDivider(),
-              PopupMenuItem(
-                value: 'logout',
-                child: Text('Sign Out'),
-              ),
+              PopupMenuItem(value: 'logout', child: Text('Sign Out')),
             ],
           ),
         ],
@@ -154,11 +130,7 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
             else if (alerts.isEmpty)
               _buildEmptyState()
             else
-              ...alerts.map(
-                (alert) => _AlertCard(
-                  alert: alert,
-                ),
-              ),
+              ...alerts.map((alert) => _AlertCard(alert: alert)),
           ],
         ),
       ),
@@ -171,9 +143,7 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
       decoration: BoxDecoration(
         color: AppColors.headerBlue.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.headerBlue.withOpacity(0.3),
-        ),
+        border: Border.all(color: AppColors.headerBlue.withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -197,19 +167,12 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
                 const SizedBox(height: 4),
                 const Text(
                   'Live SOS alerts, GPS tracking, and mesh relay active',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
                 ),
               ],
             ),
           ),
-          const Icon(
-            Icons.circle,
-            color: Colors.green,
-            size: 12,
-          ),
+          const Icon(Icons.circle, color: Colors.green, size: 12),
         ],
       ),
     );
@@ -223,24 +186,16 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.headerBlue,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                vertical: 14,
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const LiveMapScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const LiveMapScreen()),
               );
             },
-            icon: const Icon(
-              Icons.map_outlined,
-            ),
-            label: const Text(
-              'Live Map',
-            ),
+            icon: const Icon(Icons.map_outlined),
+            label: const Text('Live Map'),
           ),
         ),
         const SizedBox(width: 10),
@@ -249,24 +204,16 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.purple,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                vertical: 14,
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const MeshChatScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const MeshChatScreen()),
               );
             },
-            icon: const Icon(
-              Icons.chat_bubble_outline,
-            ),
-            label: const Text(
-              'Team Chat',
-            ),
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: const Text('Team Chat'),
           ),
         ),
       ],
@@ -275,32 +222,20 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
 
   Widget _buildEmptyState() {
     return Padding(
-      padding: const EdgeInsets.only(
-        top: 80,
-      ),
+      padding: const EdgeInsets.only(top: 80),
       child: Column(
         children: const [
-          Icon(
-            Icons.notifications_none_rounded,
-            size: 70,
-            color: Colors.grey,
-          ),
+          Icon(Icons.notifications_none_rounded, size: 70, color: Colors.grey),
           SizedBox(height: 16),
           Text(
             'No active SOS alerts right now.',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey),
           ),
           SizedBox(height: 8),
           Text(
             'New emergency alerts will appear here automatically.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
       ),
@@ -315,9 +250,7 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
 class _AlertCard extends StatelessWidget {
   final SosModel alert;
 
-  const _AlertCard({
-    required this.alert,
-  });
+  const _AlertCard({required this.alert});
 
   @override
   Widget build(BuildContext context) {
@@ -328,12 +261,13 @@ class _AlertCard extends StatelessWidget {
     final severityColor = isCritical
         ? AppColors.severityCritical
         : isHigh
-            ? AppColors.severityHigh
-            : isLow
-                ? AppColors.severityLow
-                : AppColors.severityMedium;
+        ? AppColors.severityHigh
+        : isLow
+        ? AppColors.severityLow
+        : AppColors.severityMedium;
 
-    final locationText = '${alert.latitude.toStringAsFixed(5)}, '
+    final locationText =
+        '${alert.latitude.toStringAsFixed(5)}, '
         '${alert.longitude.toStringAsFixed(5)}';
 
     final backendId = alert.id.isNotEmpty ? alert.id : alert.sosId;
@@ -341,13 +275,9 @@ class _AlertCard extends StatelessWidget {
     final attachments = _parseAttachments(alert.notes);
 
     return Card(
-      margin: const EdgeInsets.only(
-        bottom: 14,
-      ),
+      margin: const EdgeInsets.only(bottom: 14),
       elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -387,13 +317,9 @@ class _AlertCard extends StatelessWidget {
             // ------------------------------------------------------------
             // VICTIM
             // ------------------------------------------------------------
-
             Text(
               alert.userName,
-              style: const TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 5),
@@ -404,11 +330,7 @@ class _AlertCard extends StatelessWidget {
               alert.userPhone.isEmpty ? 'Not available' : alert.userPhone,
             ),
 
-            _infoRow(
-              Icons.location_on_outlined,
-              'Location',
-              locationText,
-            ),
+            _infoRow(Icons.location_on_outlined, 'Location', locationText),
 
             if (alert.accuracy > 0)
               _infoRow(
@@ -418,21 +340,14 @@ class _AlertCard extends StatelessWidget {
               ),
 
             if (alert.batteryLevel >= 0)
-              _infoRow(
-                Icons.battery_std,
-                'Battery',
-                '${alert.batteryLevel}%',
-              ),
+              _infoRow(Icons.battery_std, 'Battery', '${alert.batteryLevel}%'),
 
             // ------------------------------------------------------------
             // RISK
             // ------------------------------------------------------------
-
             if (alert.riskLevel != null)
               Container(
-                margin: const EdgeInsets.only(
-                  top: 10,
-                ),
+                margin: const EdgeInsets.only(top: 10),
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: severityColor.withOpacity(0.08),
@@ -440,10 +355,7 @@ class _AlertCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: severityColor,
-                    ),
+                    Icon(Icons.warning_amber_rounded, color: severityColor),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -461,41 +373,28 @@ class _AlertCard extends StatelessWidget {
 
             if (alert.riskReason.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(
-                  top: 6,
-                ),
+                padding: const EdgeInsets.only(top: 6),
                 child: Text(
                   'Risk reason: ${alert.riskReason}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
-                  ),
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
                 ),
               ),
 
             // ------------------------------------------------------------
             // NOTES / MESSAGE
             // ------------------------------------------------------------
-
             if (attachments.message.isNotEmpty)
-              _buildMessageBox(
-                attachments.message,
-              ),
+              _buildMessageBox(attachments.message),
 
             // ------------------------------------------------------------
             // PHOTO
             // ------------------------------------------------------------
-
             if (attachments.photoBase64 != null)
-              _buildPhotoSection(
-                context,
-                attachments.photoBase64!,
-              ),
+              _buildPhotoSection(context, attachments.photoBase64!),
 
             // ------------------------------------------------------------
             // AUDIO
             // ------------------------------------------------------------
-
             if (attachments.audioBase64 != null)
               _AudioPlayerCard(
                 audioBase64: attachments.audioBase64!,
@@ -507,7 +406,6 @@ class _AlertCard extends StatelessWidget {
             // ------------------------------------------------------------
             // ACTION BUTTONS
             // ------------------------------------------------------------
-
             Row(
               children: [
                 Expanded(
@@ -523,13 +421,8 @@ class _AlertCard extends StatelessWidget {
                         ),
                       );
                     },
-                    icon: const Icon(
-                      Icons.navigation_outlined,
-                      size: 18,
-                    ),
-                    label: const Text(
-                      'Track',
-                    ),
+                    icon: const Icon(Icons.navigation_outlined, size: 18),
+                    label: const Text('Track'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -539,7 +432,8 @@ class _AlertCard extends StatelessWidget {
                       backgroundColor: AppColors.headerBlue,
                       foregroundColor: Colors.white,
                     ),
-                    onPressed: alert.status == 'ACTIVE'
+                    onPressed:
+                        alert.status == 'ACTIVE' || alert.status == 'PENDING'
                         ? () async {
                             final success = await context
                                 .read<SosProvider>()
@@ -554,15 +448,14 @@ class _AlertCard extends StatelessWidget {
                                       ? 'SOS marked as Responding.'
                                       : 'Could not update SOS status.',
                                 ),
-                                backgroundColor:
-                                    success ? Colors.green : Colors.red,
+                                backgroundColor: success
+                                    ? Colors.green
+                                    : Colors.red,
                               ),
                             );
                           }
                         : null,
-                    child: const Text(
-                      'Responding',
-                    ),
+                    child: const Text('Responding'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -587,15 +480,14 @@ class _AlertCard extends StatelessWidget {
                                       ? 'SOS marked as Resolved.'
                                       : 'Could not resolve SOS.',
                                 ),
-                                backgroundColor:
-                                    success ? Colors.green : Colors.red,
+                                backgroundColor: success
+                                    ? Colors.green
+                                    : Colors.red,
                               ),
                             );
                           }
                         : null,
-                    child: const Text(
-                      'Resolved',
-                    ),
+                    child: const Text('Resolved'),
                   ),
                 ),
               ],
@@ -631,10 +523,7 @@ class _AlertCard extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 5,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(8),
@@ -650,39 +539,19 @@ class _AlertCard extends StatelessWidget {
     );
   }
 
-  Widget _infoRow(
-    IconData icon,
-    String label,
-    String value,
-  ) {
+  Widget _infoRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(
-        top: 6,
-      ),
+      padding: const EdgeInsets.only(top: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 17,
-            color: AppColors.headerBlue,
-          ),
+          Icon(icon, size: 17, color: AppColors.headerBlue),
           const SizedBox(width: 7),
           Text(
             '$label: ',
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 13,
-              ),
-            ),
-          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
         ],
       ),
     );
@@ -691,72 +560,46 @@ class _AlertCard extends StatelessWidget {
   Widget _buildMessageBox(String message) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(
-        top: 12,
-      ),
+      margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.amber.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.amber.withOpacity(0.3),
-        ),
+        border: Border.all(color: Colors.amber.withOpacity(0.3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.message_outlined,
-            color: Colors.orange,
-          ),
+          const Icon(Icons.message_outlined, color: Colors.orange),
           const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                fontSize: 14,
-              ),
-            ),
-          ),
+          Expanded(child: Text(message, style: const TextStyle(fontSize: 14))),
         ],
       ),
     );
   }
 
-  Widget _buildPhotoSection(
-    BuildContext context,
-    String photoBase64,
-  ) {
+  Widget _buildPhotoSection(BuildContext context, String photoBase64) {
     try {
       final bytes = base64Decode(photoBase64);
 
       return Container(
-        margin: const EdgeInsets.only(
-          top: 12,
-        ),
+        margin: const EdgeInsets.only(top: 12),
         width: double.infinity,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: AppColors.headerBlue.withOpacity(0.4),
-          ),
+          border: Border.all(color: AppColors.headerBlue.withOpacity(0.4)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(
               children: [
-                Icon(
-                  Icons.photo_camera_rounded,
-                  color: AppColors.headerBlue,
-                ),
+                Icon(Icons.photo_camera_rounded, color: AppColors.headerBlue),
                 SizedBox(width: 8),
                 Text(
                   'Emergency Photo',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -768,10 +611,7 @@ class _AlertCard extends StatelessWidget {
                   builder: (_) {
                     return Dialog(
                       child: InteractiveViewer(
-                        child: Image.memory(
-                          bytes,
-                          fit: BoxFit.contain,
-                        ),
+                        child: Image.memory(bytes, fit: BoxFit.contain),
                       ),
                     );
                   },
@@ -787,11 +627,7 @@ class _AlertCard extends StatelessWidget {
                   errorBuilder: (_, __, ___) {
                     return const SizedBox(
                       height: 150,
-                      child: Center(
-                        child: Text(
-                          'Unable to display photo',
-                        ),
-                      ),
+                      child: Center(child: Text('Unable to display photo')),
                     );
                   },
                 ),
@@ -800,25 +636,18 @@ class _AlertCard extends StatelessWidget {
             const SizedBox(height: 6),
             const Text(
               'Tap the photo to view full size',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.black54,
-              ),
+              style: TextStyle(fontSize: 11, color: Colors.black54),
             ),
           ],
         ),
       );
     } catch (_) {
       return Container(
-        margin: const EdgeInsets.only(
-          top: 12,
-        ),
+        margin: const EdgeInsets.only(top: 12),
         padding: const EdgeInsets.all(12),
         child: const Text(
           'Emergency photo was received but could not be decoded.',
-          style: TextStyle(
-            color: Colors.red,
-          ),
+          style: TextStyle(color: Colors.red),
         ),
       );
     }
@@ -828,9 +657,7 @@ class _AlertCard extends StatelessWidget {
   // ATTACHMENT PARSER
   // ==========================================================================
 
-  static _SosAttachments _parseAttachments(
-    String notes,
-  ) {
+  static _SosAttachments _parseAttachments(String notes) {
     if (notes.trim().isEmpty) {
       return const _SosAttachments();
     }
@@ -846,9 +673,7 @@ class _AlertCard extends StatelessWidget {
 
     for (final line in lines) {
       if (line.startsWith('SOS_MESSAGE:')) {
-        final value = line.substring(
-          'SOS_MESSAGE:'.length,
-        );
+        final value = line.substring('SOS_MESSAGE:'.length);
 
         if (message.isEmpty) {
           message = value.trim();
@@ -856,14 +681,10 @@ class _AlertCard extends StatelessWidget {
           message = '$message\n${value.trim()}';
         }
       } else if (line.startsWith('SOS_PHOTO_BASE64:')) {
-        final encoded = line.substring(
-          'SOS_PHOTO_BASE64:'.length,
-        );
+        final encoded = line.substring('SOS_PHOTO_BASE64:'.length);
 
         try {
-          final decodedJson = utf8.decode(
-            base64Decode(encoded),
-          );
+          final decodedJson = utf8.decode(base64Decode(encoded));
 
           final Map<String, dynamic> data = jsonDecode(decodedJson);
 
@@ -872,14 +693,10 @@ class _AlertCard extends StatelessWidget {
           photoBase64 = null;
         }
       } else if (line.startsWith('SOS_VOICE_BASE64:')) {
-        final encoded = line.substring(
-          'SOS_VOICE_BASE64:'.length,
-        );
+        final encoded = line.substring('SOS_VOICE_BASE64:'.length);
 
         try {
-          final decodedJson = utf8.decode(
-            base64Decode(encoded),
-          );
+          final decodedJson = utf8.decode(base64Decode(encoded));
 
           final Map<String, dynamic> data = jsonDecode(decodedJson);
 
@@ -927,10 +744,7 @@ class _AudioPlayerCard extends StatefulWidget {
   final String audioBase64;
   final int durationMs;
 
-  const _AudioPlayerCard({
-    required this.audioBase64,
-    required this.durationMs,
-  });
+  const _AudioPlayerCard({required this.audioBase64, required this.durationMs});
 
   @override
   State<_AudioPlayerCard> createState() => _AudioPlayerCardState();
@@ -952,35 +766,31 @@ class _AudioPlayerCardState extends State<_AudioPlayerCard> {
   void initState() {
     super.initState();
 
-    _playerStateSubscription = _audioPlayer.onPlayerStateChanged.listen(
-      (state) {
-        if (!mounted) return;
+    _playerStateSubscription = _audioPlayer.onPlayerStateChanged.listen((
+      state,
+    ) {
+      if (!mounted) return;
 
-        setState(() {
-          _playerState = state;
-        });
-      },
-    );
+      setState(() {
+        _playerState = state;
+      });
+    });
 
-    _positionSubscription = _audioPlayer.onPositionChanged.listen(
-      (position) {
-        if (!mounted) return;
+    _positionSubscription = _audioPlayer.onPositionChanged.listen((position) {
+      if (!mounted) return;
 
-        setState(() {
-          _position = position;
-        });
-      },
-    );
+      setState(() {
+        _position = position;
+      });
+    });
 
-    _durationSubscription = _audioPlayer.onDurationChanged.listen(
-      (duration) {
-        if (!mounted) return;
+    _durationSubscription = _audioPlayer.onDurationChanged.listen((duration) {
+      if (!mounted) return;
 
-        setState(() {
-          _duration = duration;
-        });
-      },
-    );
+      setState(() {
+        _duration = duration;
+      });
+    });
   }
 
   @override
@@ -1006,27 +816,19 @@ class _AudioPlayerCardState extends State<_AudioPlayerCard> {
         return;
       }
 
-      final bytes = base64Decode(
-        widget.audioBase64,
-      );
+      final bytes = base64Decode(widget.audioBase64);
 
       if (bytes.isEmpty) {
-        throw Exception(
-          'Audio data is empty.',
-        );
+        throw Exception('Audio data is empty.');
       }
 
-      await _audioPlayer.play(
-        BytesSource(bytes),
-      );
+      await _audioPlayer.play(BytesSource(bytes));
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Unable to play emergency audio: $e',
-          ),
+          content: Text('Unable to play emergency audio: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -1045,9 +847,7 @@ class _AudioPlayerCardState extends State<_AudioPlayerCard> {
   Widget build(BuildContext context) {
     final totalDuration = _duration.inMilliseconds > 0
         ? _duration
-        : Duration(
-            milliseconds: widget.durationMs,
-          );
+        : Duration(milliseconds: widget.durationMs);
 
     final maxMilliseconds = totalDuration.inMilliseconds > 0
         ? totalDuration.inMilliseconds.toDouble()
@@ -1061,32 +861,23 @@ class _AudioPlayerCardState extends State<_AudioPlayerCard> {
         .toDouble();
 
     return Container(
-      margin: const EdgeInsets.only(
-        top: 12,
-      ),
+      margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.purple.withOpacity(0.07),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Colors.purple.withOpacity(0.25),
-        ),
+        border: Border.all(color: Colors.purple.withOpacity(0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(
-                Icons.mic_rounded,
-                color: Colors.purple,
-              ),
+              Icon(Icons.mic_rounded, color: Colors.purple),
               SizedBox(width: 8),
               Text(
                 'Emergency Voice Recording',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -1108,36 +899,24 @@ class _AudioPlayerCardState extends State<_AudioPlayerCard> {
                   value: currentMilliseconds,
                   max: maxMilliseconds,
                   onChanged: (value) {
-                    _audioPlayer.seek(
-                      Duration(
-                        milliseconds: value.toInt(),
-                      ),
-                    );
+                    _audioPlayer.seek(Duration(milliseconds: value.toInt()));
                   },
                 ),
               ),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   _formatDuration(_position),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Colors.black54,
-                  ),
+                  style: const TextStyle(fontSize: 11, color: Colors.black54),
                 ),
                 Text(
                   _formatDuration(totalDuration),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Colors.black54,
-                  ),
+                  style: const TextStyle(fontSize: 11, color: Colors.black54),
                 ),
               ],
             ),
