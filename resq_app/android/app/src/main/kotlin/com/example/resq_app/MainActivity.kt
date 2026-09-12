@@ -1,6 +1,7 @@
 package com.example.resq_app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.ContactsContract
@@ -8,6 +9,8 @@ import android.telephony.SmsManager
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import java.io.File
+import java.io.FileOutputStream
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -37,10 +40,12 @@ class MainActivity : FlutterActivity() {
         private const val SMS_PERMISSION_REQUEST = 2002
         private const val BLE_PERMISSION_REQUEST = 1001
         private const val WIFI_PERMISSION_REQUEST = 1002
+        private const val FILE_PICKER_REQUEST = 5001
     }
 
     private lateinit var bleManager: BleMeshManager
     private lateinit var wifiManager: WifiDirectManager
+    private var pendingFilePickerResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(
         flutterEngine: FlutterEngine
@@ -426,11 +431,17 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
 
                 "pickFile" -> {
-                    result.error(
-                        "NOT_IMPLEMENTED",
-                        "Native file picker is not configured.",
-                        null
-                    )
+                    if (pendingFilePickerResult != null) {
+                        result.error("FILE_PICKER_BUSY", "A file picker is already open", null)
+                        return@setMethodCallHandler
+                    }
+
+                    pendingFilePickerResult = result
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "*/*"
+                    }
+                    startActivityForResult(intent, FILE_PICKER_REQUEST)
                 }
 
                 "openFile" -> {
@@ -480,6 +491,16 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 }
 
+                "broadcastPacket" -> {
+                    if (!hasAllPermissions(requiredBlePermissions())) {
+                        requestPermissions(requiredBlePermissions(), BLE_PERMISSION_REQUEST)
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    bleManager.broadcastPacket(call.argument<String>("packetData") ?: "")
+                    result.success(true)
+                }
+
                 "stopAdvertising" -> {
                     result.success(true)
                 }
@@ -515,6 +536,16 @@ class MainActivity : FlutterActivity() {
                         return@setMethodCallHandler
                     }
                     wifiManager.discoverPeers()
+                    result.success(true)
+                }
+
+                "sendPacket" -> {
+                    if (!hasAllPermissions(requiredWifiDirectPermissions())) {
+                        requestPermissions(requiredWifiDirectPermissions(), WIFI_PERMISSION_REQUEST)
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    wifiManager.sendPacket(call.argument<String>("packetData") ?: "")
                     result.success(true)
                 }
 
@@ -580,6 +611,47 @@ class MainActivity : FlutterActivity() {
             )
         } else {
             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != FILE_PICKER_REQUEST) return
+
+        val result = pendingFilePickerResult ?: return
+        pendingFilePickerResult = null
+
+        if (resultCode != RESULT_OK || data?.data == null) {
+            result.success(null)
+            return
+        }
+
+        try {
+            val uri = data.data!!
+            val resolver = contentResolver
+            val originalName = resolver.query(uri, null, null, null, null)?.use { cursor ->
+                val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst() && index >= 0) cursor.getString(index) else null
+            } ?: "selected_file"
+            val mimeType = resolver.getType(uri) ?: "application/octet-stream"
+            val safeName = originalName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val cacheFile = File(cacheDir, "resq_${System.currentTimeMillis()}_$safeName")
+
+            resolver.openInputStream(uri).use { input ->
+                if (input == null) throw IllegalStateException("Unable to read selected file")
+                FileOutputStream(cacheFile).use { output -> input.copyTo(output) }
+            }
+
+            result.success(
+                mapOf(
+                    "path" to cacheFile.absolutePath,
+                    "name" to originalName,
+                    "mimeType" to mimeType,
+                    "size" to cacheFile.length(),
+                )
+            )
+        } catch (error: Exception) {
+            result.error("FILE_PICK_FAILED", error.message, null)
         }
     }
 }
