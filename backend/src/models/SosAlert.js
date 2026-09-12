@@ -22,8 +22,8 @@ const SosAlertSchema = new mongoose.Schema(
     batteryLevel: { type: Number, default: 100 },
     status: {
       type: String,
-      enum: ['ACTIVE', 'ACKNOWLEDGED', 'RESCUED', 'CANCELLED'],
-      default: 'ACTIVE',
+      enum: ['PENDING', 'ASSIGNED', 'ACKNOWLEDGED', 'RESOLVED', 'CANCELLED', 'ACTIVE', 'RESCUED'],
+      default: 'PENDING',
     },
     severity: {
       type: String,
@@ -40,6 +40,9 @@ const SosAlertSchema = new mongoose.Schema(
     riskPredictedAt: { type: Date },
     notes: { type: String, default: '' },
     respondedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    assignedResponder: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    assignedAt: { type: Date },
+    dispatchUpdatedAt: { type: Date },
     isMeshRelayed: { type: Boolean, default: false },
     relayHops: { type: Number, default: 0 },
     meshRelayNodes: [{ type: String }],

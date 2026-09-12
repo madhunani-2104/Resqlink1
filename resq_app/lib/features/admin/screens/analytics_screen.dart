@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/file_access_service.dart';
 
 class AnalyticsScreen extends StatelessWidget {
   const AnalyticsScreen({Key? key}) : super(key: key);
@@ -10,6 +12,13 @@ class AnalyticsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Disaster Response Analytics'),
         backgroundColor: AppColors.headerBlue,
+        actions: [
+          IconButton(
+            tooltip: 'Download analytics report',
+            icon: const Icon(Icons.download),
+            onPressed: () => _downloadReport(context),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -65,26 +74,75 @@ class AnalyticsScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            const Text('SOS Severity Distribution', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              'SOS Severity Distribution',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 12),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    _buildProgressBar('Critical Severity', 0.15, AppColors.severityCritical),
+                    _buildProgressBar(
+                      'Critical Severity',
+                      0.15,
+                      AppColors.severityCritical,
+                    ),
                     const SizedBox(height: 12),
-                    _buildProgressBar('High Severity', 0.35, AppColors.severityHigh),
+                    _buildProgressBar(
+                      'High Severity',
+                      0.35,
+                      AppColors.severityHigh,
+                    ),
                     const SizedBox(height: 12),
-                    _buildProgressBar('Medium Severity', 0.30, AppColors.severityMedium),
+                    _buildProgressBar(
+                      'Medium Severity',
+                      0.30,
+                      AppColors.severityMedium,
+                    ),
                     const SizedBox(height: 12),
-                    _buildProgressBar('Low Severity', 0.20, AppColors.severityLow),
+                    _buildProgressBar(
+                      'Low Severity',
+                      0.20,
+                      AppColors.severityLow,
+                    ),
                   ],
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _downloadReport(BuildContext context) async {
+    const report = '''Metric,Value
+Average Response Time,4.2 min
+Mesh Delivery Rate,99.4%
+Total SOS Relays,"1,420"
+Active Hop Nodes,48
+Critical Severity,15%
+High Severity,35%
+Medium Severity,30%
+Low Severity,20%
+''';
+
+    final saved = await FileAccessService.saveTextFile(
+      fileName: 'resq_analytics_report.csv',
+      content: report,
+    );
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          saved
+              ? 'Analytics report saved successfully.'
+              : 'Unable to save analytics report.',
+        ),
+        backgroundColor: saved ? AppColors.success : Colors.red,
       ),
     );
   }
@@ -114,9 +172,19 @@ class AnalyticsScreen extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 10),
-          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: Colors.black54),
+          ),
         ],
       ),
     );

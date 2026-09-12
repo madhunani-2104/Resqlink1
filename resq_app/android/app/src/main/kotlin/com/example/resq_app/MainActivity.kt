@@ -1,6 +1,7 @@
 package com.example.resq_app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.ContactsContract
@@ -8,9 +9,13 @@ import android.telephony.SmsManager
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import java.io.File
+import java.io.FileOutputStream
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import com.resq.app.ble.BleMeshManager
+import com.resq.app.wifidirect.WifiDirectManager
 
 class MainActivity : FlutterActivity() {
 
@@ -33,7 +38,16 @@ class MainActivity : FlutterActivity() {
         private const val CONTACT_PERMISSION_REQUEST = 2001
 
         private const val SMS_PERMISSION_REQUEST = 2002
+        private const val BLE_PERMISSION_REQUEST = 1001
+        private const val WIFI_PERMISSION_REQUEST = 1002
+        private const val FILE_PICKER_REQUEST = 5001
+        private const val FILE_SAVE_REQUEST = 5002
     }
+
+    private lateinit var bleManager: BleMeshManager
+    private lateinit var wifiManager: WifiDirectManager
+    private var pendingFilePickerResult: MethodChannel.Result? = null
+    private var pendingFileSaveContent: String? = null
 
     override fun configureFlutterEngine(
         flutterEngine: FlutterEngine
@@ -419,11 +433,34 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
 
                 "pickFile" -> {
-                    result.error(
-                        "NOT_IMPLEMENTED",
-                        "Native file picker is not configured.",
-                        null
-                    )
+                    if (pendingFilePickerResult != null) {
+                        result.error("FILE_PICKER_BUSY", "A file picker is already open", null)
+                        return@setMethodCallHandler
+                    }
+
+                    pendingFilePickerResult = result
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "*/*"
+                    }
+                    startActivityForResult(intent, FILE_PICKER_REQUEST)
+                }
+
+                "saveFile" -> {
+                    if (pendingFilePickerResult != null) {
+                        result.error("FILE_ACCESS_BUSY", "A file operation is already open", null)
+                        return@setMethodCallHandler
+                    }
+
+                    pendingFilePickerResult = result
+                    pendingFileSaveContent = call.argument<String>("content") ?: ""
+                    val fileName = call.argument<String>("fileName") ?: "resq_report.csv"
+                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "text/csv"
+                        putExtra(Intent.EXTRA_TITLE, fileName)
+                    }
+                    startActivityForResult(intent, FILE_SAVE_REQUEST)
                 }
 
                 "openFile" -> {
@@ -444,15 +481,24 @@ class MainActivity : FlutterActivity() {
     private fun setupBleMeshChannel(
         flutterEngine: FlutterEngine
     ) {
-        MethodChannel(
+        val channel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             BLE_MESH_CHANNEL
-        ).setMethodCallHandler { call, result ->
+        )
+        bleManager = BleMeshManager(this, channel)
+
+        channel.setMethodCallHandler { call, result ->
 
             when (call.method) {
 
                 "startScan" -> {
-                    result.success(false)
+                    if (!hasAllPermissions(requiredBlePermissions())) {
+                        requestPermissions(requiredBlePermissions(), BLE_PERMISSION_REQUEST)
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    bleManager.startScan()
+                    result.success(true)
                 }
 
                 "stopScan" -> {
@@ -460,7 +506,18 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "startAdvertising" -> {
-                    result.success(false)
+                    bleManager.broadcastPacket(call.argument<String>("packetData") ?: "")
+                    result.success(true)
+                }
+
+                "broadcastPacket" -> {
+                    if (!hasAllPermissions(requiredBlePermissions())) {
+                        requestPermissions(requiredBlePermissions(), BLE_PERMISSION_REQUEST)
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    bleManager.broadcastPacket(call.argument<String>("packetData") ?: "")
+                    result.success(true)
                 }
 
                 "stopAdvertising" -> {
@@ -481,15 +538,34 @@ class MainActivity : FlutterActivity() {
     private fun setupWifiDirectChannel(
         flutterEngine: FlutterEngine
     ) {
-        MethodChannel(
+        val channel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             WIFI_DIRECT_CHANNEL
-        ).setMethodCallHandler { call, result ->
+        )
+        wifiManager = WifiDirectManager(this, channel)
+
+        channel.setMethodCallHandler { call, result ->
 
             when (call.method) {
 
                 "discoverPeers" -> {
-                    result.success(false)
+                    if (!hasAllPermissions(requiredWifiDirectPermissions())) {
+                        requestPermissions(requiredWifiDirectPermissions(), WIFI_PERMISSION_REQUEST)
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    wifiManager.discoverPeers()
+                    result.success(true)
+                }
+
+                "sendPacket" -> {
+                    if (!hasAllPermissions(requiredWifiDirectPermissions())) {
+                        requestPermissions(requiredWifiDirectPermissions(), WIFI_PERMISSION_REQUEST)
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    wifiManager.sendPacket(call.argument<String>("packetData") ?: "")
+                    result.success(true)
                 }
 
                 "stopPeerDiscovery" -> {
@@ -500,6 +576,124 @@ class MainActivity : FlutterActivity() {
                     result.notImplemented()
                 }
             }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (grantResults.isEmpty() || grantResults.any { it != PackageManager.PERMISSION_GRANTED }) {
+            return
+        }
+
+        when (requestCode) {
+            BLE_PERMISSION_REQUEST -> bleManager.startScan()
+            WIFI_PERMISSION_REQUEST -> wifiManager.discoverPeers()
+        }
+    }
+
+    private fun hasPermission(permission: String): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+            checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasAllPermissions(permissions: Array<String>): Boolean {
+        return permissions.all(::hasPermission)
+    }
+
+    private fun requiredBlePermissions(): Array<String> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_ADVERTISE,
+                Manifest.permission.BLUETOOTH_CONNECT,
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_ADMIN,
+            )
+        }
+    }
+
+    private fun requiredWifiDirectPermissions(): Array<String> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.NEARBY_WIFI_DEVICES,
+            )
+        } else {
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == FILE_SAVE_REQUEST) {
+            val result = pendingFilePickerResult ?: return
+            pendingFilePickerResult = null
+            val content = pendingFileSaveContent ?: ""
+            pendingFileSaveContent = null
+
+            if (resultCode != RESULT_OK || data?.data == null) {
+                result.success(false)
+                return
+            }
+
+            try {
+                contentResolver.openOutputStream(data.data!!).use { output ->
+                    if (output == null) throw IllegalStateException("Unable to open report destination")
+                    output.write(content.toByteArray(Charsets.UTF_8))
+                }
+                result.success(true)
+            } catch (error: Exception) {
+                result.error("FILE_SAVE_FAILED", error.message, null)
+            }
+            return
+        }
+
+        if (requestCode != FILE_PICKER_REQUEST) return
+
+        val result = pendingFilePickerResult ?: return
+        pendingFilePickerResult = null
+
+        if (resultCode != RESULT_OK || data?.data == null) {
+            result.success(null)
+            return
+        }
+
+        try {
+            val uri = data.data!!
+            val resolver = contentResolver
+            val originalName = resolver.query(uri, null, null, null, null)?.use { cursor ->
+                val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst() && index >= 0) cursor.getString(index) else null
+            } ?: "selected_file"
+            val mimeType = resolver.getType(uri) ?: "application/octet-stream"
+            val safeName = originalName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val cacheFile = File(cacheDir, "resq_${System.currentTimeMillis()}_$safeName")
+
+            resolver.openInputStream(uri).use { input ->
+                if (input == null) throw IllegalStateException("Unable to read selected file")
+                FileOutputStream(cacheFile).use { output -> input.copyTo(output) }
+            }
+
+            result.success(
+                mapOf(
+                    "path" to cacheFile.absolutePath,
+                    "name" to originalName,
+                    "mimeType" to mimeType,
+                    "size" to cacheFile.length(),
+                )
+            )
+        } catch (error: Exception) {
+            result.error("FILE_PICK_FAILED", error.message, null)
         }
     }
 }

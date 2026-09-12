@@ -2,6 +2,7 @@ const User = require('../models/User');
 const { generateToken } = require('../config/jwt');
 
 const RESCUE_ACCESS_CODE = process.env.RESCUE_TEAM_ACCESS_CODE;
+const ADMIN_ACCESS_CODE = process.env.ADMIN_ACCESS_CODE || RESCUE_ACCESS_CODE;
 
 if (!RESCUE_ACCESS_CODE) {
   console.error('[STARTUP ERROR] RESCUE_TEAM_ACCESS_CODE environment variable is not set.');
@@ -26,7 +27,21 @@ const formatAuthUser = (user) => ({
 // @access  Public
 const registerUser = async (req, res, next) => {
   try {
-    const { name, email, phone, password, role } = req.body;
+    const { name, email, phone, password, role = 'user', accessCode } = req.body;
+
+    if (!['user', 'admin'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid registration role',
+      });
+    }
+
+    if (role === 'admin' && (!accessCode || accessCode !== ADMIN_ACCESS_CODE)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Valid admin access code is required',
+      });
+    }
 
     const userExists = await User.findOne({ $or: [{ email }, { phone }] });
     if (userExists) {
@@ -43,7 +58,7 @@ const registerUser = async (req, res, next) => {
       email,
       phone,
       password,
-      role: 'user',
+      role,
       meshId,
     });
 

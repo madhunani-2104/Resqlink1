@@ -1,14 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../auth/providers/auth_provider.dart';
+import '../../auth/models/user_model.dart';
 import 'medical_info_screen.dart';
 import 'emergency_contacts_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../scoreboard/screens/scoreboard_screen.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/preference_service.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  int _emergencyContactCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEmergencyContactCount();
+  }
+
+  Future<void> _loadEmergencyContactCount() async {
+    final userData = await PreferenceService.getUserData();
+    if (!mounted || userData == null) return;
+
+    final user = UserModel.fromJson(userData);
+    setState(() {
+      _emergencyContactCount = user.emergencyContacts.length;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,14 +54,23 @@ class ProfileScreen extends StatelessWidget {
                     radius: 44,
                     backgroundColor: AppColors.primary.withOpacity(0.2),
                     child: Text(
-                      user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'U',
-                      style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      user?.name.isNotEmpty == true
+                          ? user!.name[0].toUpperCase()
+                          : 'U',
+                      style: const TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     user?.name ?? 'ResQ User',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -49,7 +84,8 @@ class ProfileScreen extends StatelessWidget {
             _buildOptionCard(
               context,
               title: 'Emergency Medical Info',
-              subtitle: 'Blood Group: ${user?.medicalInfo.bloodGroup ?? "Unknown"} • Allergies & Conditions',
+              subtitle:
+                  'Blood Group: ${user?.medicalInfo.bloodGroup ?? "Unknown"} • Allergies & Conditions',
               icon: Icons.medical_services_outlined,
               onTap: () {
                 Navigator.push(
@@ -62,13 +98,16 @@ class ProfileScreen extends StatelessWidget {
             _buildOptionCard(
               context,
               title: 'Emergency Contacts',
-              subtitle: '${user?.emergencyContacts.length ?? 0} Contacts Configured',
+              subtitle: '$_emergencyContactCount Contacts Configured',
               icon: Icons.contact_phone_outlined,
-              onTap: () {
-                Navigator.push(
+              onTap: () async {
+                await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const EmergencyContactsScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const EmergencyContactsScreen(),
+                  ),
                 );
+                _loadEmergencyContactCount();
               },
             ),
             const SizedBox(height: 12),
@@ -80,9 +119,7 @@ class ProfileScreen extends StatelessWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const ScoreboardScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const ScoreboardScreen()),
                 );
               },
             ),
@@ -127,7 +164,10 @@ class ProfileScreen extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon, color: AppColors.primary, size: 28),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(fontSize: 12, color: Colors.white70),
+        ),
         trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
         onTap: onTap,
       ),

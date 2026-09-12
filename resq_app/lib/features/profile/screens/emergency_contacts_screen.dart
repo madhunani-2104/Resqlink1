@@ -10,6 +10,7 @@ import '../../../widgets/custom_button.dart';
 import '../../../widgets/custom_textfield.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/emergency_contact_notification_service.dart';
+import '../../../core/services/preference_service.dart';
 
 class EmergencyContactsScreen extends StatefulWidget {
   const EmergencyContactsScreen({super.key});
@@ -24,8 +25,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _relationController =
-      TextEditingController(text: 'Family');
+  final TextEditingController _relationController = TextEditingController(
+    text: 'Family',
+  );
 
   bool _isImporting = false;
 
@@ -33,16 +35,27 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   void initState() {
     super.initState();
 
-    final authProvider = Provider.of<AuthProvider>(
-      context,
-      listen: false,
-    );
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     final user = authProvider.user;
 
     if (user != null) {
       _contacts.addAll(user.emergencyContacts);
     }
+
+    _loadSavedContacts();
+  }
+
+  Future<void> _loadSavedContacts() async {
+    final savedUserData = await PreferenceService.getUserData();
+    if (!mounted || savedUserData == null) return;
+
+    final savedUser = UserModel.fromJson(savedUserData);
+    setState(() {
+      _contacts
+        ..clear()
+        ..addAll(savedUser.emergencyContacts);
+    });
   }
 
   @override
@@ -125,10 +138,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   // ------------------------------------------------------------
 
   Future<void> _saveContacts() async {
-    final authProvider = Provider.of<AuthProvider>(
-      context,
-      listen: false,
-    );
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     final profileProvider = Provider.of<ProfileProvider>(
       context,
@@ -157,9 +167,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Emergency contacts saved successfully.',
-          ),
+          content: Text('Emergency contacts saved successfully.'),
           backgroundColor: AppColors.success,
         ),
       );
@@ -168,9 +176,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Failed to save emergency contacts.',
-          ),
+          content: Text('Failed to save emergency contacts.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -193,19 +199,13 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
           backgroundColor: AppColors.darkSurface,
           title: const Text(
             'Add Emergency Contact',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CustomTextField(
-                  controller: _nameController,
-                  labelText: 'Name',
-                ),
+                CustomTextField(controller: _nameController, labelText: 'Name'),
                 const SizedBox(height: 12),
                 CustomTextField(
                   controller: _phoneController,
@@ -227,10 +227,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
               },
               child: const Text('Cancel'),
             ),
-            ElevatedButton(
-              onPressed: _addContact,
-              child: const Text('Add'),
-            ),
+            ElevatedButton(onPressed: _addContact, child: const Text('Add')),
           ],
         );
       },
@@ -255,9 +252,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         context: context,
         builder: (dialogContext) {
           return AlertDialog(
-            title: const Text(
-              'Contacts Permission Required',
-            ),
+            title: const Text('Contacts Permission Required'),
             content: const Text(
               'ResQ needs permission to read your phone contacts.\n\n'
               'The permission was permanently denied. '
@@ -312,9 +307,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       if (!permissionGranted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Contacts permission was not granted.',
-            ),
+            content: Text('Contacts permission was not granted.'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -329,9 +322,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       if (deviceContacts.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'No contacts with phone numbers were found.',
-            ),
+            content: Text('No contacts with phone numbers were found.'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -366,19 +357,13 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       if (addedCount > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              '$addedCount contact(s) imported successfully.',
-            ),
+            content: Text('$addedCount contact(s) imported successfully.'),
             backgroundColor: AppColors.success,
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Selected contacts are already added.',
-            ),
-          ),
+          const SnackBar(content: Text('Selected contacts are already added.')),
         );
       }
     } catch (e) {
@@ -386,9 +371,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Unable to import contacts: $e',
-          ),
+          content: Text('Unable to import contacts: $e'),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 5),
         ),
@@ -417,10 +400,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return StatefulBuilder(
-          builder: (
-            context,
-            setSheetState,
-          ) {
+          builder: (context, setSheetState) {
             return SafeArea(
               child: Container(
                 height: MediaQuery.of(context).size.height * 0.82,
@@ -465,14 +445,10 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                     ),
                     const SizedBox(height: 6),
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Text(
                         '${contacts.length} device contacts found',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                        ),
+                        style: TextStyle(color: Colors.grey.shade600),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -480,19 +456,12 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                     Expanded(
                       child: ListView.builder(
                         itemCount: contacts.length,
-                        itemBuilder: (
-                          context,
-                          index,
-                        ) {
+                        itemBuilder: (context, index) {
                           final contact = contacts[index];
 
-                          final phone = _normalizePhone(
-                            contact.phone,
-                          );
+                          final phone = _normalizePhone(contact.phone);
 
-                          final isSelected = selectedPhones.contains(
-                            phone,
-                          );
+                          final isSelected = selectedPhones.contains(phone);
 
                           return CheckboxListTile(
                             value: isSelected,
@@ -539,16 +508,12 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                                   final selected = contacts
                                       .where(
                                         (contact) => selectedPhones.contains(
-                                          _normalizePhone(
-                                            contact.phone,
-                                          ),
+                                          _normalizePhone(contact.phone),
                                         ),
                                       )
                                       .toList();
 
-                                  Navigator.of(
-                                    sheetContext,
-                                  ).pop(selected);
+                                  Navigator.of(sheetContext).pop(selected);
                                 },
                           child: Text(
                             selectedPhones.isEmpty
@@ -581,9 +546,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          '${contact.name} removed.',
-        ),
+        content: Text('${contact.name} removed.'),
         action: SnackBarAction(
           label: 'UNDO',
           onPressed: () {
@@ -592,10 +555,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
             final insertIndex = index.clamp(0, _contacts.length);
 
             setState(() {
-              _contacts.insert(
-                insertIndex,
-                contact,
-              );
+              _contacts.insert(insertIndex, contact);
             });
           },
         ),
@@ -607,42 +567,26 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   // CONTACT CARD
   // ------------------------------------------------------------
 
-  Widget _buildContactCard(
-    EmergencyContact contact,
-    int index,
-  ) {
+  Widget _buildContactCard(EmergencyContact contact, int index) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 6,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         leading: const CircleAvatar(
           backgroundColor: AppColors.primary,
-          child: Icon(
-            Icons.person,
-            color: Colors.white,
-          ),
+          child: Icon(Icons.person, color: Colors.white),
         ),
         title: Text(
           contact.name,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            '${contact.phone} • ${contact.relationship}',
-          ),
+          child: Text('${contact.phone} • ${contact.relationship}'),
         ),
         trailing: IconButton(
           tooltip: 'Remove contact',
-          icon: const Icon(
-            Icons.delete_outline,
-            color: Colors.redAccent,
-          ),
+          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
           onPressed: () {
             _deleteContact(index);
           },
@@ -660,9 +604,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     final profileProvider = Provider.of<ProfileProvider>(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Emergency Contacts'),
-      ),
+      appBar: AppBar(title: const Text('Emergency Contacts')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -682,18 +624,12 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 child: const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.shield_rounded,
-                      color: AppColors.primary,
-                    ),
+                    Icon(Icons.shield_rounded, color: AppColors.primary),
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'Emergency contacts can be notified when you send an SOS alert.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          height: 1.4,
-                        ),
+                        style: TextStyle(fontSize: 13, height: 1.4),
                       ),
                     ),
                   ],
@@ -712,13 +648,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                             Icon(
                               Icons.contact_phone_outlined,
                               size: 64,
-                              color: Colors.grey.withValues(
-                                alpha: 0.5,
-                              ),
+                              color: Colors.grey.withValues(alpha: 0.5),
                             ),
-                            const SizedBox(
-                              height: 14,
-                            ),
+                            const SizedBox(height: 14),
                             const Text(
                               'No Emergency Contacts',
                               style: TextStyle(
@@ -726,15 +658,11 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(
-                              height: 6,
-                            ),
+                            const SizedBox(height: 6),
                             const Text(
                               'Add a contact manually or import one from your phone.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.grey,
-                              ),
+                              style: TextStyle(color: Colors.grey),
                             ),
                           ],
                         ),
@@ -742,10 +670,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                     : ListView.builder(
                         itemCount: _contacts.length,
                         itemBuilder: (context, index) {
-                          return _buildContactCard(
-                            _contacts[index],
-                            index,
-                          );
+                          return _buildContactCard(_contacts[index], index);
                         },
                       ),
               ),
@@ -758,12 +683,8 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _showAddContactDialog,
-                      icon: const Icon(
-                        Icons.add,
-                      ),
-                      label: const Text(
-                        'Add Contact',
-                      ),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Contact'),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -774,16 +695,10 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                           ? const SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(
-                              Icons.contacts_outlined,
-                            ),
-                      label: Text(
-                        _isImporting ? 'Importing...' : 'Import',
-                      ),
+                          : const Icon(Icons.contacts_outlined),
+                      label: Text(_isImporting ? 'Importing...' : 'Import'),
                     ),
                   ),
                 ],

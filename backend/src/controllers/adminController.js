@@ -11,9 +11,13 @@ const getAdminStats = async (req, res, next) => {
   try {
     const totalUsers = await User.countDocuments();
     const totalResponders = await User.countDocuments({ role: 'rescue_team' });
-    const activeSosCount = await SosAlert.countDocuments({ status: 'ACTIVE' });
+    const activeSosCount = await SosAlert.countDocuments({
+      status: { $in: ['PENDING', 'ASSIGNED', 'ACTIVE', 'ACKNOWLEDGED'] },
+    });
     const acknowledgedSosCount = await SosAlert.countDocuments({ status: 'ACKNOWLEDGED' });
-    const rescuedSosCount = await SosAlert.countDocuments({ status: 'RESCUED' });
+    const rescuedSosCount = await SosAlert.countDocuments({
+      status: { $in: ['RESOLVED', 'RESCUED'] },
+    });
     const totalMeshPackets = await MeshMessage.countDocuments();
     const totalSafeZones = await SafeZone.countDocuments();
     const totalShelters = await Shelter.countDocuments();

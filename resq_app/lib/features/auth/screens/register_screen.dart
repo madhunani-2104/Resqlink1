@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/auth_provider.dart';
 import '../../../widgets/custom_button.dart';
 import '../../../widgets/custom_textfield.dart';
@@ -18,6 +19,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _accessCodeController = TextEditingController();
+  String _selectedRole = 'user';
   bool _obscurePassword = true;
 
   @override
@@ -26,6 +29,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
+    _accessCodeController.dispose();
     super.dispose();
   }
 
@@ -38,6 +42,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailController.text.trim(),
         phone: _phoneController.text.trim(),
         password: _passwordController.text.trim(),
+        role: _selectedRole,
+        accessCode: _selectedRole == 'admin'
+            ? _accessCodeController.text.trim()
+            : null,
       );
 
       if (success && mounted) {
@@ -81,7 +89,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _nameController,
                   labelText: 'Full Name',
                   prefixIcon: Icons.person_outline,
-                  validator: (val) => val != null && val.isNotEmpty ? null : 'Name is required',
+                  validator: (val) =>
+                      val != null && val.isNotEmpty ? null : 'Name is required',
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
@@ -89,7 +98,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   labelText: 'Email Address',
                   prefixIcon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
-                  validator: (val) => val != null && val.contains('@') ? null : 'Valid email required',
+                  validator: (val) => val != null && val.contains('@')
+                      ? null
+                      : 'Valid email required',
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
@@ -97,7 +108,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   labelText: 'Phone Number',
                   prefixIcon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
-                  validator: (val) => val != null && val.length >= 8 ? null : 'Valid phone required',
+                  validator: (val) => val != null && val.length >= 8
+                      ? null
+                      : 'Valid phone required',
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
@@ -107,12 +120,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   obscureText: _obscurePassword,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
                     ),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
-                  validator: (val) => val != null && val.length >= 6 ? null : 'Min 6 characters',
+                  validator: (val) => val != null && val.length >= 6
+                      ? null
+                      : 'Min 6 characters',
                 ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _selectedRole,
+                  decoration: const InputDecoration(
+                    labelText: 'Account Type',
+                    prefixIcon: Icon(Icons.badge_outlined),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'user',
+                      child: Text('Civic / Victim'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'admin',
+                      child: Text('Disaster Response Admin'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedRole = value);
+                    }
+                  },
+                ),
+                if (_selectedRole == 'admin') ...[
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: _accessCodeController,
+                    labelText: 'Admin Access Code',
+                    prefixIcon: Icons.verified_user_outlined,
+                    obscureText: true,
+                    validator: (val) =>
+                        _selectedRole != 'admin' ||
+                            (val != null && val.trim().isNotEmpty)
+                        ? null
+                        : 'Admin access code required',
+                  ),
+                ],
                 const SizedBox(height: 30),
                 CustomButton(
                   text: 'Complete Registration',
