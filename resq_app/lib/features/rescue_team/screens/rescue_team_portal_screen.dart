@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../auth/screens/login_screen.dart';
 import '../../map/screens/live_map_screen.dart';
 import '../../mesh_chat/screens/mesh_chat_screen.dart';
 import '../../sos/models/sos_model.dart';
@@ -67,9 +68,15 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
         foregroundColor: Colors.white,
         actions: [
           PopupMenuButton<String>(
-            onSelected: (value) {
+            onSelected: (value) async {
               if (value == 'logout') {
-                context.read<AuthProvider>().logout();
+                await context.read<AuthProvider>().logout();
+                if (!context.mounted) return;
+
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (_) => false,
+                );
                 return;
               }
 
