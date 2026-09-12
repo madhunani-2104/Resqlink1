@@ -1,4 +1,5 @@
 import 'package:geolocator/geolocator.dart';
+
 import '../utils/logger.dart';
 
 class LocationService {
@@ -22,10 +23,7 @@ class LocationService {
       }
 
       if (permission == LocationPermission.denied) {
-        AppLogger.warning(
-          'Location permission was denied.',
-          'LocationService',
-        );
+        AppLogger.warning('Location permission was denied.', 'LocationService');
         return null;
       }
 
@@ -56,6 +54,60 @@ class LocationService {
     } catch (e) {
       AppLogger.error(
         'Error fetching current GPS position',
+        e,
+        null,
+        'LocationService',
+      );
+      return null;
+    }
+  }
+
+  static Future<Stream<Position>?> getPositionStream() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        AppLogger.warning(
+          'Location services are disabled on device.',
+          'LocationService',
+        );
+        return null;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        AppLogger.warning(
+          'Location permission is unavailable.',
+          'LocationService',
+        );
+        return null;
+      }
+
+      return Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.best,
+          distanceFilter: 5,
+        ),
+      );
+    } on LocationServiceDisabledException {
+      AppLogger.warning(
+        'Location services became unavailable while starting GPS updates.',
+        'LocationService',
+      );
+      return null;
+    } on PermissionDeniedException {
+      AppLogger.warning(
+        'Location permission was denied while starting GPS updates.',
+        'LocationService',
+      );
+      return null;
+    } catch (e) {
+      AppLogger.error(
+        'Error starting GPS position updates',
         e,
         null,
         'LocationService',

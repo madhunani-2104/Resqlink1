@@ -415,8 +415,11 @@ class _AlertCard extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => LiveTrackingScreen(
+                            sosId: alert.sosId,
                             victimName: alert.userName,
                             coordinates: locationText,
+                            victimLatitude: alert.latitude,
+                            victimLongitude: alert.longitude,
                           ),
                         ),
                       );
