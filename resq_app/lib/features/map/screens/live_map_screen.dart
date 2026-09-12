@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/map_provider.dart';
 import '../../../core/constants/app_colors.dart';
 
@@ -16,6 +17,17 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   final MapController _mapController = MapController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshMapLayers());
+  }
+
+  Future<void> _refreshMapLayers() async {
+    await context.read<MapProvider>().fetchMapLayers();
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     final mapProvider = Provider.of<MapProvider>(context);
 
@@ -23,6 +35,11 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
       appBar: AppBar(
         title: const Text('Live Disaster Map & GIS'),
         actions: [
+          IconButton(
+            tooltip: 'Refresh map layers',
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshMapLayers,
+          ),
           IconButton(
             icon: const Icon(Icons.my_location),
             onPressed: () {
@@ -67,7 +84,11 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                     point: mapProvider.currentLocation,
                     width: 40,
                     height: 40,
-                    child: const Icon(Icons.person_pin_circle_rounded, color: AppColors.secondary, size: 40),
+                    child: const Icon(
+                      Icons.person_pin_circle_rounded,
+                      color: AppColors.secondary,
+                      size: 40,
+                    ),
                   ),
 
                   // Safe Zones
@@ -77,8 +98,17 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                       width: 36,
                       height: 36,
                       child: GestureDetector(
-                        onTap: () => _showMarkerDetails(context, sz.name, sz.description, 'Safe Zone'),
-                        child: const Icon(Icons.shield, color: AppColors.success, size: 34),
+                        onTap: () => _showMarkerDetails(
+                          context,
+                          sz.name,
+                          sz.description,
+                          'Safe Zone',
+                        ),
+                        child: const Icon(
+                          Icons.shield,
+                          color: AppColors.success,
+                          size: 34,
+                        ),
                       ),
                     );
                   }).toList(),
@@ -96,7 +126,11 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                           'Address: ${sh.address}\nCapacity: ${sh.currentOccupants}/${sh.capacity}\nAmenities: ${sh.amenities.join(", ")}',
                           'Shelter',
                         ),
-                        child: const Icon(Icons.night_shelter_rounded, color: AppColors.accentAlert, size: 34),
+                        child: const Icon(
+                          Icons.night_shelter_rounded,
+                          color: AppColors.accentAlert,
+                          size: 34,
+                        ),
                       ),
                     );
                   }).toList(),
@@ -114,7 +148,11 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                           'Severity: ${v.severity}\nPhone: ${v.userPhone}\nNotes: ${v.notes}',
                           'Active SOS Distress',
                         ),
-                        child: const Icon(Icons.warning_rounded, color: AppColors.primary, size: 40),
+                        child: const Icon(
+                          Icons.warning_rounded,
+                          color: AppColors.primary,
+                          size: 40,
+                        ),
                       ),
                     );
                   }).toList(),
@@ -131,7 +169,10 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
             child: Card(
               color: AppColors.darkSurface.withOpacity(0.9),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -170,7 +211,10 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     required Function(bool) onChanged,
   }) {
     return FilterChip(
-      label: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+      ),
       selected: value,
       selectedColor: color.withOpacity(0.3),
       checkmarkColor: color,
@@ -178,7 +222,12 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     );
   }
 
-  void _showMarkerDetails(BuildContext context, String title, String details, String category) {
+  void _showMarkerDetails(
+    BuildContext context,
+    String title,
+    String details,
+    String category,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.darkSurface,
@@ -194,12 +243,25 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
             children: [
               Text(
                 category.toUpperCase(),
-                style: const TextStyle(color: AppColors.primaryLight, fontWeight: FontWeight.bold, fontSize: 12),
+                style: const TextStyle(
+                  color: AppColors.primaryLight,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 6),
-              Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 10),
-              Text(details, style: const TextStyle(fontSize: 14, color: Colors.white70)),
+              Text(
+                details,
+                style: const TextStyle(fontSize: 14, color: Colors.white70),
+              ),
               const SizedBox(height: 20),
             ],
           ),
