@@ -135,7 +135,7 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
                 ),
               )
             else if (alerts.isEmpty)
-              _buildEmptyState()
+              _buildEmptyState(context)
             else
               ...alerts.map((alert) => _AlertCard(alert: alert)),
           ],
@@ -172,9 +172,12 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Live SOS alerts, GPS tracking, and mesh relay active',
-                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -227,22 +230,29 @@ class _RescueTeamPortalScreenState extends State<RescueTeamPortalScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 80),
       child: Column(
-        children: const [
-          Icon(Icons.notifications_none_rounded, size: 70, color: Colors.grey),
+        children: [
+          Icon(
+            Icons.notifications_none_rounded,
+            size: 70,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           SizedBox(height: 16),
           Text(
             'No active SOS alerts right now.',
-            style: TextStyle(fontSize: 16, color: Colors.grey),
+            style: TextStyle(fontSize: 16),
           ),
           SizedBox(height: 8),
           Text(
             'New emergency alerts will appear here automatically.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -315,7 +325,7 @@ class _AlertCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                _buildStatusBadge(alert.status),
+                _buildStatusBadge(context, alert.status),
               ],
             ),
 
@@ -383,7 +393,10 @@ class _AlertCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
                   'Risk reason: ${alert.riskReason}',
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
 
@@ -508,7 +521,7 @@ class _AlertCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(BuildContext context, String status) {
     Color color;
 
     switch (status.toUpperCase()) {
@@ -525,11 +538,11 @@ class _AlertCard extends StatelessWidget {
         break;
 
       case 'CANCELLED':
-        color = Colors.grey;
+        color = Theme.of(context).colorScheme.onSurfaceVariant;
         break;
 
       default:
-        color = Colors.blue;
+        color = Theme.of(context).colorScheme.onSurfaceVariant;
     }
 
     return Container(
@@ -644,9 +657,12 @@ class _AlertCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Tap the photo to view full size',
-              style: TextStyle(fontSize: 11, color: Colors.black54),
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -922,11 +938,17 @@ class _AudioPlayerCardState extends State<_AudioPlayerCard> {
               children: [
                 Text(
                   _formatDuration(_position),
-                  style: const TextStyle(fontSize: 11, color: Colors.black54),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 Text(
                   _formatDuration(totalDuration),
-                  style: const TextStyle(fontSize: 11, color: Colors.black54),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),

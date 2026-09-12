@@ -270,11 +270,13 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                               fontSize: 16,
                             ),
                           ),
-                          const Text(
+                          Text(
                             'Distance: 0.8 km • Multi-hop Mesh Beacon',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.black54,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                           ),
                         ],
