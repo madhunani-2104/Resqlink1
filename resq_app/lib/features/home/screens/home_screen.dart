@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/voice_recording_service.dart';
@@ -28,7 +29,8 @@ class HomeScreen extends StatelessWidget {
     final authProvider = Provider.of<AuthProvider>(context);
     final meshProvider = Provider.of<MeshChatProvider>(context);
     final userName = authProvider.user?.name ?? 'Test';
-    final nodeId = authProvider.user?.id.substring(0, 10).toUpperCase() ?? 'DEV-USER-1';
+    final nodeId =
+        authProvider.user?.id.substring(0, 10).toUpperCase() ?? 'DEV-USER-1';
     final role = authProvider.user?.role ?? 'user';
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final menuItems = <PopupMenuEntry<String>>[
@@ -37,7 +39,10 @@ class HomeScreen extends StatelessWidget {
           value: 'admin',
           child: Row(
             children: [
-              Icon(Icons.admin_panel_settings_outlined, color: AppColors.headerBlue),
+              Icon(
+                Icons.admin_panel_settings_outlined,
+                color: AppColors.headerBlue,
+              ),
               SizedBox(width: 10),
               Text('Admin Console'),
             ],
@@ -57,7 +62,9 @@ class HomeScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      backgroundColor: isDark
+          ? AppColors.darkBackground
+          : AppColors.lightBackground,
       appBar: AppBar(
         backgroundColor: AppColors.headerBlue,
         elevation: 0,
@@ -74,11 +81,15 @@ class HomeScreen extends StatelessWidget {
             ? null
             : [
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.settings_outlined, color: Colors.white),
+                  icon: const Icon(
+                    Icons.settings_outlined,
+                    color: Colors.white,
+                  ),
                   onSelected: (value) {
                     if (value == 'admin' && onNavigateToAdmin != null) {
                       onNavigateToAdmin!();
-                    } else if (value == 'rescue' && onNavigateToRescueTeam != null) {
+                    } else if (value == 'rescue' &&
+                        onNavigateToRescueTeam != null) {
                       onNavigateToRescueTeam!();
                     }
                   },
@@ -139,7 +150,10 @@ class HomeScreen extends StatelessWidget {
 
                 // Mesh Network Status Card
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: isDark ? AppColors.darkSurface : Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -361,7 +375,9 @@ class HomeScreen extends StatelessWidget {
                     title: 'File Sharing',
                     onTap: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('BLE/Wi-Fi Direct File Transfer Ready')),
+                        const SnackBar(
+                          content: Text('BLE/Wi-Fi Direct File Transfer Ready'),
+                        ),
                       );
                     },
                     isDark: isDark,
@@ -474,7 +490,9 @@ class HomeScreen extends StatelessWidget {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.headerBlue),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.headerBlue,
+                    ),
                   ),
                 ),
             ],
@@ -619,33 +637,42 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 16),
             const Icon(Icons.mic_rounded, size: 60, color: Colors.pink),
             const SizedBox(height: 12),
-            const Text('Record an emergency voice note and broadcast its local file reference across mesh.'),
+            const Text(
+              'Record an emergency voice note and broadcast its local file reference across mesh.',
+            ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: () async {
                 final auth = context.read<AuthProvider>();
                 final mesh = context.read<MeshChatProvider>();
                 final user = auth.user;
-                final recordingPath = await VoiceRecordingService.startRecording();
+                final recordingPath =
+                    await VoiceRecordingService.startRecording();
                 await Future.delayed(const Duration(seconds: 5));
-                final savedPath = await VoiceRecordingService.stopRecording() ?? recordingPath;
+                final savedPath =
+                    await VoiceRecordingService.stopRecording() ??
+                    recordingPath;
                 Navigator.pop(ctx);
                 final voicePayload = savedPath == null
                     ? null
-                    : await VoiceRecordingService.readRecordingBase64(savedPath);
+                    : await VoiceRecordingService.createVoiceMessagePayload(
+                        savedPath,
+                      );
                 if (user != null && voicePayload != null) {
-                  await mesh.sendMessage(
+                  await mesh.sendVoiceMessage(
                     senderId: user.id,
                     senderName: user.name,
                     receiverId: 'BROADCAST',
-                    text: 'VOICE_MESSAGE_BASE64:$voicePayload',
+                    voicePayload: voicePayload,
                   );
                 }
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(voicePayload == null
-                        ? 'Microphone permission needed for voice recording.'
-                        : 'Voice message broadcast across Mesh.'),
+                    content: Text(
+                      voicePayload == null
+                          ? 'Microphone permission needed for voice recording.'
+                          : 'Voice message broadcast across Mesh.',
+                    ),
                   ),
                 );
               },
@@ -682,7 +709,9 @@ class HomeScreen extends StatelessWidget {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text('Sends an emergency push alert across all nearby BLE/Wi-Fi Direct mesh nodes.'),
+            const Text(
+              'Sends an emergency push alert across all nearby BLE/Wi-Fi Direct mesh nodes.',
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
@@ -696,7 +725,9 @@ class HomeScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                ),
                 onPressed: () async {
                   final text = controller.text.trim();
                   if (text.isEmpty) return;
@@ -714,7 +745,9 @@ class HomeScreen extends StatelessWidget {
                   }
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Emergency Broadcast sent across Mesh Network!'),
+                      content: Text(
+                        'Emergency Broadcast sent across Mesh Network!',
+                      ),
                       backgroundColor: AppColors.primary,
                     ),
                   );

@@ -11,6 +11,8 @@ import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import com.resq.app.ble.BleMeshManager
+import com.resq.app.wifidirect.WifiDirectManager
 
 class MainActivity : FlutterActivity() {
 
@@ -33,7 +35,12 @@ class MainActivity : FlutterActivity() {
         private const val CONTACT_PERMISSION_REQUEST = 2001
 
         private const val SMS_PERMISSION_REQUEST = 2002
+        private const val BLE_PERMISSION_REQUEST = 1001
+        private const val WIFI_PERMISSION_REQUEST = 1002
     }
+
+    private lateinit var bleManager: BleMeshManager
+    private lateinit var wifiManager: WifiDirectManager
 
     override fun configureFlutterEngine(
         flutterEngine: FlutterEngine
@@ -444,15 +451,24 @@ class MainActivity : FlutterActivity() {
     private fun setupBleMeshChannel(
         flutterEngine: FlutterEngine
     ) {
-        MethodChannel(
+        val channel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             BLE_MESH_CHANNEL
-        ).setMethodCallHandler { call, result ->
+        )
+        bleManager = BleMeshManager(this, channel)
+
+        channel.setMethodCallHandler { call, result ->
 
             when (call.method) {
 
                 "startScan" -> {
-                    result.success(false)
+                    if (!hasAllPermissions(requiredBlePermissions())) {
+                        requestPermissions(requiredBlePermissions(), BLE_PERMISSION_REQUEST)
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    bleManager.startScan()
+                    result.success(true)
                 }
 
                 "stopScan" -> {
@@ -460,7 +476,8 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "startAdvertising" -> {
-                    result.success(false)
+                    bleManager.broadcastPacket(call.argument<String>("packetData") ?: "")
+                    result.success(true)
                 }
 
                 "stopAdvertising" -> {
@@ -481,15 +498,24 @@ class MainActivity : FlutterActivity() {
     private fun setupWifiDirectChannel(
         flutterEngine: FlutterEngine
     ) {
-        MethodChannel(
+        val channel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             WIFI_DIRECT_CHANNEL
-        ).setMethodCallHandler { call, result ->
+        )
+        wifiManager = WifiDirectManager(this, channel)
+
+        channel.setMethodCallHandler { call, result ->
 
             when (call.method) {
 
                 "discoverPeers" -> {
-                    result.success(false)
+                    if (!hasAllPermissions(requiredWifiDirectPermissions())) {
+                        requestPermissions(requiredWifiDirectPermissions(), WIFI_PERMISSION_REQUEST)
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    wifiManager.discoverPeers()
+                    result.success(true)
                 }
 
                 "stopPeerDiscovery" -> {
@@ -500,6 +526,60 @@ class MainActivity : FlutterActivity() {
                     result.notImplemented()
                 }
             }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (grantResults.isEmpty() || grantResults.any { it != PackageManager.PERMISSION_GRANTED }) {
+            return
+        }
+
+        when (requestCode) {
+            BLE_PERMISSION_REQUEST -> bleManager.startScan()
+            WIFI_PERMISSION_REQUEST -> wifiManager.discoverPeers()
+        }
+    }
+
+    private fun hasPermission(permission: String): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+            checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasAllPermissions(permissions: Array<String>): Boolean {
+        return permissions.all(::hasPermission)
+    }
+
+    private fun requiredBlePermissions(): Array<String> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_ADVERTISE,
+                Manifest.permission.BLUETOOTH_CONNECT,
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_ADMIN,
+            )
+        }
+    }
+
+    private fun requiredWifiDirectPermissions(): Array<String> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.NEARBY_WIFI_DEVICES,
+            )
+        } else {
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 }
