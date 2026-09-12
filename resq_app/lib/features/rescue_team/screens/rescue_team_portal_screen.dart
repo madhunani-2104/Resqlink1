@@ -420,6 +420,12 @@ class _AlertCard extends StatelessWidget {
                 audioBase64: attachments.audioBase64!,
                 durationMs: attachments.audioDurationMs,
               ),
+            if (attachments.voiceMessageAttached &&
+                attachments.audioBase64 == null)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Text('Voice message attached'),
+              ),
 
             const SizedBox(height: 14),
 
@@ -692,14 +698,21 @@ class _AlertCard extends StatelessWidget {
 
     String? photoBase64;
     String? audioBase64;
+    var voiceMessageAttached = false;
 
     int audioDurationMs = 0;
+    const voicePrefix = 'SOS_VOICE_BASE64:';
 
     final lines = notes.split('\n');
 
     for (final line in lines) {
       if (line.startsWith('SOS_MESSAGE:')) {
         final value = line.substring('SOS_MESSAGE:'.length);
+
+        if (value.contains(voicePrefix)) {
+          voiceMessageAttached = true;
+          continue;
+        }
 
         if (message.isEmpty) {
           message = value.trim();
@@ -718,8 +731,9 @@ class _AlertCard extends StatelessWidget {
         } catch (_) {
           photoBase64 = null;
         }
-      } else if (line.startsWith('SOS_VOICE_BASE64:')) {
-        final encoded = line.substring('SOS_VOICE_BASE64:'.length);
+      } else if (line.startsWith(voicePrefix)) {
+        voiceMessageAttached = true;
+        final encoded = line.substring(voicePrefix.length);
 
         try {
           final decodedJson = utf8.decode(base64Decode(encoded));
@@ -740,6 +754,7 @@ class _AlertCard extends StatelessWidget {
       photoBase64: photoBase64,
       audioBase64: audioBase64,
       audioDurationMs: audioDurationMs,
+      voiceMessageAttached: voiceMessageAttached,
     );
   }
 }
@@ -753,12 +768,14 @@ class _SosAttachments {
   final String? photoBase64;
   final String? audioBase64;
   final int audioDurationMs;
+  final bool voiceMessageAttached;
 
   const _SosAttachments({
     this.message = '',
     this.photoBase64,
     this.audioBase64,
     this.audioDurationMs = 0,
+    this.voiceMessageAttached = false,
   });
 }
 

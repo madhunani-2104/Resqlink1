@@ -464,7 +464,13 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "openFile" -> {
-                    result.success(false)
+                    val path = call.argument<String>("path")
+                    val mimeType = call.argument<String>("mimeType") ?: "application/octet-stream"
+                    if (path.isNullOrBlank()) {
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    result.success(openLocalFile(path, mimeType))
                 }
 
                 else -> {
@@ -630,6 +636,27 @@ class MainActivity : FlutterActivity() {
             )
         } else {
             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    private fun openLocalFile(path: String, mimeType: String): Boolean {
+        return try {
+            val file = File(path)
+            if (!file.exists()) return false
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                "com.example.resq_app.fileprovider",
+                file,
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 

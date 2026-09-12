@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/map_provider.dart';
+import '../../sos/models/sos_model.dart';
 import '../../../core/constants/app_colors.dart';
 
 class LiveMapScreen extends StatefulWidget {
@@ -24,7 +25,39 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
 
   Future<void> _refreshMapLayers() async {
     await context.read<MapProvider>().fetchMapLayers();
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      _fitAllMapLayers();
+    }
+  }
+
+  void _fitAllMapLayers() {
+    final provider = context.read<MapProvider>();
+    final points = <LatLng>[
+      provider.currentLocation,
+      ...provider.safeZones.map(
+        (zone) => LatLng(zone.latitude, zone.longitude),
+      ),
+      ...provider.shelters.map(
+        (shelter) => LatLng(shelter.latitude, shelter.longitude),
+      ),
+      ...provider.victims.map(
+        (victim) => LatLng(victim.latitude, victim.longitude),
+      ),
+    ];
+
+    if (points.length < 2) return;
+
+    try {
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: LatLngBounds.fromPoints(points),
+          padding: const EdgeInsets.all(56),
+        ),
+      );
+    } catch (_) {
+      // The map controller is not ready until the map has mounted.
+    }
   }
 
   @override
@@ -55,6 +88,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
             options: MapOptions(
               initialCenter: mapProvider.currentLocation,
               initialZoom: 14.0,
+              onMapReady: _fitAllMapLayers,
             ),
             children: [
               TileLayer(
@@ -74,6 +108,29 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                     radius: sz.radiusMeters,
                   );
                 }).toList(),
+              ),
+
+              // Risk areas use the SOS location accuracy as the geographic radius.
+              CircleLayer(
+                circles: mapProvider.victims
+                    .where(
+                      (victim) =>
+                          victim.accuracy > 0 &&
+                          (victim.riskLevel != null ||
+                              victim.riskScore != null),
+                    )
+                    .map((victim) {
+                      final color = _riskColor(victim);
+                      return CircleMarker(
+                        point: LatLng(victim.latitude, victim.longitude),
+                        color: color.withOpacity(0.16),
+                        borderColor: color,
+                        borderStrokeWidth: 2,
+                        useRadiusInMeter: true,
+                        radius: victim.accuracy,
+                      );
+                    })
+                    .toList(),
               ),
 
               // Markers for User, Safe Zones, Shelters, and SOS Victims
@@ -136,6 +193,23 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   }).toList(),
 
                   // SOS Victims
+                  ...mapProvider.victims
+                      .where((v) {
+                        return v.riskLevel != null || v.riskScore != null;
+                      })
+                      .map((v) {
+                        return Marker(
+                          point: LatLng(v.latitude, v.longitude),
+                          width: 52,
+                          height: 52,
+                          child: Icon(
+                            Icons.circle,
+                            color: _riskColor(v).withOpacity(0.35),
+                            size: 52,
+                          ),
+                        );
+                      })
+                      .toList(),
                   ...mapProvider.victims.map((v) {
                     return Marker(
                       point: LatLng(v.latitude, v.longitude),
@@ -173,28 +247,30 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   horizontal: 12,
                   vertical: 8,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildFilterChip(
-                      label: 'Safe Zones',
-                      color: AppColors.success,
-                      value: mapProvider.showSafeZones,
-                      onChanged: mapProvider.toggleSafeZones,
-                    ),
-                    _buildFilterChip(
-                      label: 'Shelters',
-                      color: AppColors.accentAlert,
-                      value: mapProvider.showShelters,
-                      onChanged: mapProvider.toggleShelters,
-                    ),
-                    _buildFilterChip(
-                      label: 'SOS Victims',
-                      color: AppColors.primary,
-                      value: mapProvider.showVictims,
-                      onChanged: mapProvider.toggleVictims,
-                    ),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildFilterChip(
+                        label: 'Safe Zones',
+                        color: AppColors.success,
+                        value: mapProvider.showSafeZones,
+                        onChanged: mapProvider.toggleSafeZones,
+                      ),
+                      _buildFilterChip(
+                        label: 'Shelters',
+                        color: AppColors.accentAlert,
+                        value: mapProvider.showShelters,
+                        onChanged: mapProvider.toggleShelters,
+                      ),
+                      _buildFilterChip(
+                        label: 'SOS Victims',
+                        color: AppColors.primary,
+                        value: mapProvider.showVictims,
+                        onChanged: mapProvider.toggleVictims,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -220,6 +296,17 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
       checkmarkColor: color,
       onSelected: onChanged,
     );
+  }
+
+  Color _riskColor(SosModel victim) {
+    final risk = victim.riskLevel?.toUpperCase();
+    if (risk == 'HIGH' || (victim.riskScore ?? 0) >= 70) {
+      return AppColors.severityCritical;
+    }
+    if (risk == 'MEDIUM' || (victim.riskScore ?? 0) >= 40) {
+      return AppColors.severityMedium;
+    }
+    return AppColors.success;
   }
 
   void _showMarkerDetails(

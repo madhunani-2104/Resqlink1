@@ -48,6 +48,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   bool _stopRequested = false;
 
+  bool _isStoppingVoiceRecording = false;
+
   Duration _recordingDuration = Duration.zero;
 
   // ============================================================
@@ -149,6 +151,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       return;
     }
 
+    if (_isStoppingVoiceRecording) {
+      debugPrint('CHAT MIC: Stop already in progress');
+      return;
+    }
+
+    _isStoppingVoiceRecording = true;
+
     _recordingTimer?.cancel();
     _recordingTimer = null;
 
@@ -164,6 +173,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     debugPrint('CHAT MIC: Recording stopped. path=$path');
 
     if (!mounted) {
+      _isStoppingVoiceRecording = false;
       return;
     }
 
@@ -181,6 +191,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       setState(() {
         _recordingDuration = Duration.zero;
       });
+
+      _isStoppingVoiceRecording = false;
 
       ScaffoldMessenger.of(
         context,
@@ -200,6 +212,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         _recordingDuration = Duration.zero;
       });
 
+      _isStoppingVoiceRecording = false;
+
       return;
     }
 
@@ -216,6 +230,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       setState(() {
         _recordingDuration = Duration.zero;
       });
+
+      _isStoppingVoiceRecording = false;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please hold the microphone longer.')),
@@ -236,6 +252,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     );
 
     if (!mounted) {
+      _isStoppingVoiceRecording = false;
       return;
     }
 
@@ -245,6 +262,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       setState(() {
         _recordingDuration = Duration.zero;
       });
+
+      _isStoppingVoiceRecording = false;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not create voice message.')),
@@ -293,12 +312,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
 
     if (!mounted) {
+      _isStoppingVoiceRecording = false;
       return;
     }
 
     setState(() {
       _recordingDuration = Duration.zero;
     });
+
+    _isStoppingVoiceRecording = false;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -839,6 +861,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
+
+                  onTap: () {
+                    if (_isRecording) {
+                      _stopVoiceRecording();
+                    } else {
+                      _startVoiceRecording();
+                    }
+                  },
 
                   onLongPressStart: (_) {
                     debugPrint('CHAT MIC UI: LONG PRESS START');

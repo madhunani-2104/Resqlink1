@@ -157,23 +157,26 @@ class _HeatMapsScreenState extends State<HeatMapsScreen> {
                           child: Card(
                             child: Padding(
                               padding: const EdgeInsets.all(14.0),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceAround,
-                                children: const [
-                                  _LegendItem(
-                                    color: AppColors.severityCritical,
-                                    label: 'High Risk (SOS > 10)',
-                                  ),
-                                  _LegendItem(
-                                    color: AppColors.severityMedium,
-                                    label: 'Moderate Risk',
-                                  ),
-                                  _LegendItem(
-                                    color: AppColors.success,
-                                    label: 'Safe Zone',
-                                  ),
-                                ],
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: const [
+                                    _LegendItem(
+                                      color: AppColors.severityCritical,
+                                      label: 'High Risk (SOS > 10)',
+                                    ),
+                                    SizedBox(width: 18),
+                                    _LegendItem(
+                                      color: AppColors.severityMedium,
+                                      label: 'Moderate Risk',
+                                    ),
+                                    SizedBox(width: 18),
+                                    _LegendItem(
+                                      color: AppColors.success,
+                                      label: 'Safe Zone',
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
