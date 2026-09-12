@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 
 import '../constants/api_endpoints.dart';
@@ -15,7 +16,7 @@ class DioClient {
   DioClient._internal() {
     _dio = Dio(
       BaseOptions(
-        baseUrl: ApiEndpoints.baseUrl,
+        baseUrl: kIsWeb ? ApiEndpoints.webBaseUrl : ApiEndpoints.baseUrl,
 
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 60),

@@ -38,7 +38,25 @@ connectDB();
 
 // Setup Express Middlewares
 app.use(helmet({ crossOriginResourcePolicy: false }));
-app.use(cors());
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (
+      !origin ||
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+    ) {
+      return callback(null, true);
+    }
+
+    // Preserve the existing API behavior for other browser origins.
+    callback(null, true);
+  },
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 

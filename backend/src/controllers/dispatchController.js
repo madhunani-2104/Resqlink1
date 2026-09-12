@@ -42,26 +42,34 @@ const assignSos = async (req, res, next) => {
     const responderId = String(req.body.responderId || '');
     if (!responderId) return res.status(400).json({ success: false, message: 'responderId is required' });
 
-    const responder = await User.findOne({ _id: responderId, role: 'rescue_team', isActive: true });
-    if (!responder) return res.status(404).json({ success: false, message: 'Available responder not found' });
-    if (responder.availabilityStatus === 'BUSY') return res.status(409).json({ success: false, message: 'Responder is already busy' });
+    const responder = await User.findOneAndUpdate(
+      { _id: responderId, role: 'rescue_team', isActive: true, availabilityStatus: 'AVAILABLE' },
+      { availabilityStatus: 'BUSY', isOnline: true },
+      { new: true },
+    );
+    if (!responder) return res.status(409).json({ success: false, message: 'Responder is not available' });
 
-    const alert = await SosAlert.findOne({ $or: [{ _id: req.params.id }, { sosId: req.params.id }] });
-    if (!alert) return res.status(404).json({ success: false, message: 'SOS alert not found' });
-    if (!isDispatchableStatus(alert.status) || alert.assignedResponder) {
+    const alert = await SosAlert.findOneAndUpdate(
+      {
+        $or: [{ _id: req.params.id }, { sosId: req.params.id }],
+        status: { $in: ['PENDING', 'ACTIVE'] },
+        assignedResponder: { $exists: false },
+      },
+      {
+        $set: {
+          assignedResponder: responder._id,
+          respondedBy: responder._id,
+          assignedAt: new Date(),
+          dispatchUpdatedAt: new Date(),
+          status: 'ASSIGNED',
+        },
+      },
+      { new: true },
+    );
+    if (!alert) {
+      await User.findByIdAndUpdate(responder._id, { availabilityStatus: 'AVAILABLE' });
       return res.status(409).json({ success: false, message: 'SOS cannot be assigned in its current state' });
     }
-
-    alert.assignedResponder = responder._id;
-    alert.respondedBy = responder._id;
-    alert.assignedAt = new Date();
-    alert.dispatchUpdatedAt = new Date();
-    alert.status = 'ASSIGNED';
-    await alert.save();
-
-    responder.availabilityStatus = 'BUSY';
-    responder.isOnline = true;
-    await responder.save();
     emitDispatchUpdate(req, alert);
     res.json({ success: true, data: alert });
   } catch (error) {

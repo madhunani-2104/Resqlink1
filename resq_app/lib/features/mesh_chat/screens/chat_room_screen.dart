@@ -44,6 +44,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   bool _isRecording = false;
 
+  bool _isStartingRecording = false;
+
+  bool _stopRequested = false;
+
   Duration _recordingDuration = Duration.zero;
 
   // ============================================================
@@ -71,14 +75,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Future<void> _startVoiceRecording() async {
     debugPrint('CHAT MIC: _startVoiceRecording CALLED');
 
-    if (_isRecording) {
+    if (_isRecording || _isStartingRecording) {
       debugPrint('CHAT MIC: Already recording');
       return;
     }
 
+    _isStartingRecording = true;
+    _stopRequested = false;
+
     debugPrint('CHAT MIC: Calling VoiceRecordingService.startRecording()');
 
     final path = await VoiceRecordingService.startRecording();
+
+    _isStartingRecording = false;
 
     debugPrint('CHAT MIC: Recording path = $path');
 
@@ -93,6 +102,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         const SnackBar(content: Text('Microphone permission is required.')),
       );
 
+      return;
+    }
+
+    if (_stopRequested) {
+      await VoiceRecordingService.stopRecording();
+      _stopRequested = false;
       return;
     }
 
@@ -123,6 +138,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   Future<void> _stopVoiceRecording({bool send = true}) async {
     debugPrint('CHAT MIC: _stopVoiceRecording CALLED - send=$send');
+
+    if (_isStartingRecording) {
+      _stopRequested = true;
+      return;
+    }
 
     if (!_isRecording) {
       debugPrint('CHAT MIC: Not currently recording');

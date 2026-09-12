@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+
 import '../../../core/utils/mesh_packet.dart';
 import '../../../core/utils/logger.dart';
 import '../../../core/database/db_helper.dart';
@@ -7,7 +9,8 @@ class MeshRouter {
   final String localNodeId;
   final Set<String> _seenPacketIds = {};
   final List<MeshPacket> _storeAndForwardBuffer = [];
-  final StreamController<MeshPacket> _receivedPacketController = StreamController<MeshPacket>.broadcast();
+  final StreamController<MeshPacket> _receivedPacketController =
+      StreamController<MeshPacket>.broadcast();
 
   Stream<MeshPacket> get onPacketReceived => _receivedPacketController.stream;
 
@@ -17,7 +20,10 @@ class MeshRouter {
   Future<bool> processIncomingPacket(MeshPacket packet) async {
     // 1. Deduplication Check
     if (_seenPacketIds.contains(packet.packetId)) {
-      AppLogger.debug('Duplicate packet ignored: ${packet.packetId}', 'MeshRouter');
+      AppLogger.debug(
+        'Duplicate packet ignored: ${packet.packetId}',
+        'MeshRouter',
+      );
       return false;
     }
     _seenPacketIds.add(packet.packetId);
@@ -27,17 +33,27 @@ class MeshRouter {
       _seenPacketIds.remove(_seenPacketIds.first);
     }
 
-    AppLogger.info('Received mesh packet #${packet.packetId} from ${packet.senderName} (Hop: ${packet.hopCount}, TTL: ${packet.ttl})', 'MeshRouter');
+    AppLogger.info(
+      'Received mesh packet #${packet.packetId} from ${packet.senderName} (Hop: ${packet.hopCount}, TTL: ${packet.ttl})',
+      'MeshRouter',
+    );
 
     // 2. Persist Packet in Local Database (Safe catch)
     try {
-      await DBHelper.instance.insertMessage(packet.toJson());
+      final row = packet.toJson();
+      row['relayedBy'] = jsonEncode(packet.relayedBy);
+      await DBHelper.instance.insertMessage(row);
       await DBHelper.instance.addToSyncQueue(
-        packet.packetType == MeshPacketType.sosBeacon ? 'SOS_ALERT' : 'MESH_MESSAGE',
+        packet.packetType == MeshPacketType.sosBeacon
+            ? 'SOS_ALERT'
+            : 'MESH_MESSAGE',
         packet.toPayloadString(),
       );
     } catch (e) {
-      AppLogger.debug('Database persistence skipped or offline: $e', 'MeshRouter');
+      AppLogger.debug(
+        'Database persistence skipped or offline: $e',
+        'MeshRouter',
+      );
     }
 
     // Always Notify UI listeners
@@ -45,7 +61,10 @@ class MeshRouter {
 
     // 3. Multi-Hop Forwarding Criteria Check
     if (packet.ttl <= 1 || packet.senderId == localNodeId) {
-      AppLogger.debug('Packet relay skipped for ${packet.packetId}', 'MeshRouter');
+      AppLogger.debug(
+        'Packet relay skipped for ${packet.packetId}',
+        'MeshRouter',
+      );
       return true;
     }
 

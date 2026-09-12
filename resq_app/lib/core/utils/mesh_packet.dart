@@ -1,12 +1,6 @@
 import 'dart:convert';
 
-enum MeshPacketType {
-  chat,
-  sosBeacon,
-  locationUpdate,
-  ack,
-  nodeHeartbeat,
-}
+enum MeshPacketType { chat, sosBeacon, locationUpdate, ack, nodeHeartbeat }
 
 class MeshPacket {
   final String packetId;
@@ -41,8 +35,8 @@ class MeshPacket {
     this.riskScore,
     this.riskReason,
     DateTime? timestampSent,
-  })  : relayedBy = relayedBy ?? [],
-        timestampSent = timestampSent ?? DateTime.now();
+  }) : relayedBy = relayedBy ?? [],
+       timestampSent = timestampSent ?? DateTime.now();
 
   /// Create packet from JSON Map
   factory MeshPacket.fromJson(Map<String, dynamic> json) {
@@ -55,9 +49,13 @@ class MeshPacket {
       packetType: _parseType(json['packetType']),
       ttl: json['ttl'] ?? 7,
       hopCount: json['hopCount'] ?? 0,
-      relayedBy: List<String>.from(json['relayedBy'] ?? []),
-      latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
-      longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
+      relayedBy: _parseRelayedBy(json['relayedBy']),
+      latitude: json['latitude'] != null
+          ? (json['latitude'] as num).toDouble()
+          : null,
+      longitude: json['longitude'] != null
+          ? (json['longitude'] as num).toDouble()
+          : null,
       riskLevel: json['riskLevel']?.toString(),
       riskScore: (json['riskScore'] as num?)?.toDouble(),
       riskReason: json['riskReason']?.toString(),
@@ -130,5 +128,23 @@ class MeshPacket {
     if (str.contains('ack')) return MeshPacketType.ack;
     if (str.contains('heartbeat')) return MeshPacketType.nodeHeartbeat;
     return MeshPacketType.chat;
+  }
+
+  static List<String> _parseRelayedBy(dynamic value) {
+    if (value is String) {
+      try {
+        final decoded = jsonDecode(value);
+        if (decoded is List) {
+          return List<String>.from(decoded);
+        }
+      } catch (_) {}
+      return value.isEmpty ? [] : [value];
+    }
+
+    if (value is List) {
+      return List<String>.from(value);
+    }
+
+    return [];
   }
 }

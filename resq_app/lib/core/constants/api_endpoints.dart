@@ -4,13 +4,13 @@ class ApiEndpoints {
   // ============================================================
 
   // PC IP:
-  // 192.168.0.128
+  // 192.168.170.7
   //
   // Backend:
-  // http://192.168.0.128:5000
+  // http://192.168.170.7:5000
   //
   // API:
-  // http://192.168.0.128:5000/api
+  // http://192.168.170.7:5000/api
   //
   // IMPORTANT:
   // Phone and PC must be connected to the same Wi-Fi.
@@ -23,7 +23,7 @@ class ApiEndpoints {
 
   static const String baseUrl = 'http://192.168.0.128:5000/api';
 
-  static const String webBaseUrl = 'http://192.168.0.128:5000/api';
+  static const String webBaseUrl = 'http://localhost:5000/api';
 
   // ============================================================
   // AUTH
