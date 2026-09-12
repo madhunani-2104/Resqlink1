@@ -418,7 +418,7 @@ const resolveSosAlert = async (
       });
     }
 
-    if (!['ACKNOWLEDGED', 'ASSIGNED', 'ACTIVE'].includes(alert.status)) {
+    if (!['PENDING', 'ACKNOWLEDGED', 'ASSIGNED', 'ACTIVE'].includes(alert.status)) {
       return res.status(409).json({
         success: false,
         message: `Cannot resolve SOS in ${alert.status} state`,
