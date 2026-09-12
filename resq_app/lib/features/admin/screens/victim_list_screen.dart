@@ -143,7 +143,7 @@ class _VictimListScreenState extends State<VictimListScreen> {
             Text('Status: ${alert.status}'),
             if (alert.assignedResponderName != null)
               Text('Responder: ${alert.assignedResponderName}'),
-            if (alert.notes.isNotEmpty) Text('Notes: ${alert.notes}'),
+            _buildTrackingSummary(alert),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -188,5 +188,43 @@ class _VictimListScreenState extends State<VictimListScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildTrackingSummary(dynamic alert) {
+    final details = <String>[
+      'Status: ${alert.status}',
+      'Victim: (${alert.latitude.toStringAsFixed(5)}, '
+          '${alert.longitude.toStringAsFixed(5)})',
+      'Created: ${_formatTrackingTime(alert.createdAt)}',
+    ];
+
+    if (alert.assignedResponderName?.toString().trim().isNotEmpty == true) {
+      details.add('Responder: ${alert.assignedResponderName}');
+    }
+    if (alert.accuracy > 0) {
+      details.add('Accuracy: ${alert.accuracy.toStringAsFixed(1)} m');
+    }
+    if (alert.assignedAt != null) {
+      details.add('Assigned: ${_formatTrackingTime(alert.assignedAt)}');
+    }
+    if (alert.batteryLevel >= 0) {
+      details.add('Battery: ${alert.batteryLevel}%');
+    } else if (alert.riskLevel?.toString().trim().isNotEmpty == true) {
+      details.add('Risk: ${alert.riskLevel}');
+    }
+
+    return Text(
+      details.join(' • '),
+      style: const TextStyle(color: AppColors.bleActive, fontSize: 12),
+    );
+  }
+
+  String _formatTrackingTime(DateTime time) {
+    final local = time.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.year}-$month-$day $hour:$minute';
   }
 }
