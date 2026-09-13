@@ -26,8 +26,8 @@ class SafeZoneModel {
       id: json['_id'] ?? json['id'] ?? '',
       name: json['name'] ?? '',
       description: json['description'] ?? '',
-      latitude: (json['latitude'] as num).toDouble(),
-      longitude: (json['longitude'] as num).toDouble(),
+      latitude: _coordinateFromJson(json['latitude']),
+      longitude: _coordinateFromJson(json['longitude']),
       radiusMeters: (json['radiusMeters'] as num? ?? 500).toDouble(),
       zoneType: json['zoneType'] ?? 'SAFE_HAVEN',
       status: json['status'] ?? 'OPEN',
@@ -66,8 +66,8 @@ class ShelterModel {
       id: json['_id'] ?? json['id'] ?? '',
       name: json['name'] ?? '',
       address: json['address'] ?? '',
-      latitude: (json['latitude'] as num).toDouble(),
-      longitude: (json['longitude'] as num).toDouble(),
+      latitude: _coordinateFromJson(json['latitude']),
+      longitude: _coordinateFromJson(json['longitude']),
       phone: json['phone'] ?? '',
       capacity: json['capacity'] ?? 100,
       currentOccupants: json['currentOccupants'] ?? 0,
@@ -75,4 +75,8 @@ class ShelterModel {
       status: json['status'] ?? 'OPERATIONAL',
     );
   }
+}
+
+double _coordinateFromJson(dynamic value) {
+  return value is num ? value.toDouble() : 0;
 }

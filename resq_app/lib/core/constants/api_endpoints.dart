@@ -63,6 +63,8 @@ class ApiEndpoints {
 
   static const String activeSos = '/sos/active';
 
+  static const String rescueActivities = '/sos/activity';
+
   static String acknowledgeSos(String id) {
     return '/sos/$id/acknowledge';
   }

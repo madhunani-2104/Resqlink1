@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/logger.dart';
@@ -11,6 +12,7 @@ class LeaderboardEntry {
   final String role;
   final int helpPoints;
   final int rescuesCompleted;
+  final int victimsHelped;
 
   const LeaderboardEntry({
     required this.rank,
@@ -19,6 +21,7 @@ class LeaderboardEntry {
     required this.role,
     required this.helpPoints,
     required this.rescuesCompleted,
+    required this.victimsHelped,
   });
 
   factory LeaderboardEntry.fromJson(Map<String, dynamic> json) {
@@ -29,6 +32,7 @@ class LeaderboardEntry {
       role: json['role']?.toString() ?? 'user',
       helpPoints: (json['helpPoints'] as num?)?.toInt() ?? 0,
       rescuesCompleted: (json['rescuesCompleted'] as num?)?.toInt() ?? 0,
+      victimsHelped: (json['victimsHelped'] as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -40,12 +44,14 @@ class ScoreboardProvider extends ChangeNotifier {
   String? _errorMessage;
   int _helpPoints = 0;
   int _rescuesCompleted = 0;
+  int _victimsHelped = 0;
   List<LeaderboardEntry> _leaderboard = [];
 
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   int get helpPoints => _helpPoints;
   int get rescuesCompleted => _rescuesCompleted;
+  int get victimsHelped => _victimsHelped;
   List<LeaderboardEntry> get leaderboard => List.unmodifiable(_leaderboard);
 
   Future<void> loadScoreboard() async {
@@ -63,33 +69,55 @@ class ScoreboardProvider extends ChangeNotifier {
       final leaderboardResponse = responses[1];
 
       if (scoreResponse.data['success'] != true) {
-        throw Exception(scoreResponse.data['message'] ?? 'Unable to load your score.');
+        throw Exception(
+          scoreResponse.data['message'] ?? 'Unable to load your score.',
+        );
       }
       if (leaderboardResponse.data['success'] != true) {
-        throw Exception(leaderboardResponse.data['message'] ?? 'Unable to load leaderboard.');
+        throw Exception(
+          leaderboardResponse.data['message'] ?? 'Unable to load leaderboard.',
+        );
       }
 
-      final scoreData = Map<String, dynamic>.from(scoreResponse.data['data'] as Map);
+      final scoreData = Map<String, dynamic>.from(
+        scoreResponse.data['data'] as Map,
+      );
       final leaderboardData = leaderboardResponse.data['data'];
 
       _helpPoints = (scoreData['helpPoints'] as num?)?.toInt() ?? 0;
       _rescuesCompleted = (scoreData['rescuesCompleted'] as num?)?.toInt() ?? 0;
+      _victimsHelped = (scoreData['victimsHelped'] as num?)?.toInt() ?? 0;
       _leaderboard = leaderboardData is List
           ? leaderboardData
-              .whereType<Map>()
-              .map((entry) => LeaderboardEntry.fromJson(Map<String, dynamic>.from(entry)))
-              .toList()
+                .whereType<Map>()
+                .map(
+                  (entry) => LeaderboardEntry.fromJson(
+                    Map<String, dynamic>.from(entry),
+                  ),
+                )
+                .toList()
           : [];
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         _errorMessage = 'Your session has expired. Please sign in again.';
       } else {
-        _errorMessage = 'Unable to load the scoreboard. Please check your connection.';
+        _errorMessage =
+            'Unable to load the scoreboard. Please check your connection.';
       }
-      AppLogger.error('Failed to load scoreboard', e, e.stackTrace, 'ScoreboardProvider');
+      AppLogger.error(
+        'Failed to load scoreboard',
+        e,
+        e.stackTrace,
+        'ScoreboardProvider',
+      );
     } catch (e) {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
-      AppLogger.error('Failed to load scoreboard', e, null, 'ScoreboardProvider');
+      AppLogger.error(
+        'Failed to load scoreboard',
+        e,
+        null,
+        'ScoreboardProvider',
+      );
     } finally {
       _isLoading = false;
       notifyListeners();

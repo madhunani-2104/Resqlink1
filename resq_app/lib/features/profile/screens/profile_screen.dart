@@ -7,6 +7,7 @@ import 'medical_info_screen.dart';
 import 'emergency_contacts_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../scoreboard/screens/scoreboard_screen.dart';
+import '../../rescue_activity/screens/rescue_activity_screen.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/preference_service.dart';
 
@@ -120,6 +121,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const ScoreboardScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildOptionCard(
+              context,
+              title: 'Rescue Activity',
+              subtitle: 'Review completed rescue activity records',
+              icon: Icons.history_edu_outlined,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RescueActivityScreen(),
+                  ),
                 );
               },
             ),

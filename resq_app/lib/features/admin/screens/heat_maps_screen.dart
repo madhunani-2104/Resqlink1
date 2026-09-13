@@ -98,6 +98,72 @@ class _HeatMapsScreenState extends State<HeatMapsScreen> {
                               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                               userAgentPackageName: 'com.resq.app',
                             ),
+                            CircleLayer(
+                              circles: mapProvider.safeZones.map((zone) {
+                                return CircleMarker(
+                                  point: LatLng(zone.latitude, zone.longitude),
+                                  radius: zone.radiusMeters,
+                                  useRadiusInMeter: true,
+                                  color: AppColors.success.withOpacity(0.2),
+                                  borderColor: AppColors.success,
+                                  borderStrokeWidth: 2,
+                                );
+                              }).toList(),
+                            ),
+                            MarkerLayer(
+                              markers: [
+                                ...mapProvider.safeZones.map((zone) {
+                                  return Marker(
+                                    point: LatLng(
+                                      zone.latitude,
+                                      zone.longitude,
+                                    ),
+                                    width: 48,
+                                    height: 48,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: AppColors.success,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.shield,
+                                        color: Colors.white,
+                                        size: 30,
+                                      ),
+                                    ),
+                                  );
+                                }),
+                                ...mapProvider.shelters.map((shelter) {
+                                  return Marker(
+                                    point: LatLng(
+                                      shelter.latitude,
+                                      shelter.longitude,
+                                    ),
+                                    width: 48,
+                                    height: 48,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: AppColors.accentAlert,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.night_shelter_rounded,
+                                        color: Colors.white,
+                                        size: 30,
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
                             if (_activeLayer == 'Distress Heat') ...[
                               CircleLayer(
                                 circles: victims.map((victim) {

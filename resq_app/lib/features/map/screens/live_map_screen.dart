@@ -152,8 +152,8 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   ...mapProvider.safeZones.map((sz) {
                     return Marker(
                       point: LatLng(sz.latitude, sz.longitude),
-                      width: 36,
-                      height: 36,
+                      width: 48,
+                      height: 48,
                       child: GestureDetector(
                         onTap: () => _showMarkerDetails(
                           context,
@@ -161,10 +161,17 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                           sz.description,
                           'Safe Zone',
                         ),
-                        child: const Icon(
-                          Icons.shield,
-                          color: AppColors.success,
-                          size: 34,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.success,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(
+                            Icons.shield,
+                            color: Colors.white,
+                            size: 30,
+                          ),
                         ),
                       ),
                     );
@@ -174,8 +181,8 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   ...mapProvider.shelters.map((sh) {
                     return Marker(
                       point: LatLng(sh.latitude, sh.longitude),
-                      width: 36,
-                      height: 36,
+                      width: 48,
+                      height: 48,
                       child: GestureDetector(
                         onTap: () => _showMarkerDetails(
                           context,
@@ -183,10 +190,17 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                           'Address: ${sh.address}\nCapacity: ${sh.currentOccupants}/${sh.capacity}\nAmenities: ${sh.amenities.join(", ")}',
                           'Shelter',
                         ),
-                        child: const Icon(
-                          Icons.night_shelter_rounded,
-                          color: AppColors.accentAlert,
-                          size: 34,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.accentAlert,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(
+                            Icons.night_shelter_rounded,
+                            color: Colors.white,
+                            size: 30,
+                          ),
                         ),
                       ),
                     );

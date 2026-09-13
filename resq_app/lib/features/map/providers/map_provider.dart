@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
+
 import '../models/map_models.dart';
 import '../../sos/models/sos_model.dart';
 import '../../../core/network/dio_client.dart';
@@ -46,8 +47,12 @@ class MapProvider extends ChangeNotifier {
 
       await fetchMapLayers();
     } catch (e) {
-      AppLogger.error('Failed to init location/map layers', e, null, 'MapProvider');
-      _loadDummyOfflineData();
+      AppLogger.error(
+        'Failed to init location/map layers',
+        e,
+        null,
+        'MapProvider',
+      );
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -57,82 +62,72 @@ class MapProvider extends ChangeNotifier {
   Future<void> fetchMapLayers() async {
     try {
       final response = await _dioClient.instance.get(ApiEndpoints.mapLayers);
-      if (response.data['success'] == true) {
-        final data = response.data['data'];
-        _safeZones = (data['safeZones'] as List)
-            .map((item) => SafeZoneModel.fromJson(item))
-            .toList();
-        _shelters = (data['shelters'] as List)
-            .map((item) => ShelterModel.fromJson(item))
-            .toList();
-        _victims = (data['victims'] as List)
-            .map((item) => SosModel.fromJson(item))
-            .toList();
+      final responseData = response.data;
+      if (responseData is! Map<String, dynamic> ||
+          responseData['success'] != true ||
+          responseData['data'] is! Map<String, dynamic>) {
+        throw StateError('Map layers API returned an invalid response');
       }
+
+      final data = responseData['data'] as Map<String, dynamic>;
+      _safeZones = _parseSafeZones(data['safeZones']);
+      _shelters = _parseShelters(data['shelters']);
+      _victims = _parseVictims(data['victims']);
+      notifyListeners();
     } catch (e) {
-      AppLogger.warning('Map layers API unavailable, loading offline GIS layers', 'MapProvider');
-      _loadDummyOfflineData();
+      AppLogger.error(
+        'Failed to load map layers from API',
+        e,
+        null,
+        'MapProvider',
+      );
     }
   }
 
-  void _loadDummyOfflineData() {
-    _safeZones = [
-      SafeZoneModel(
-        id: 'SZ-101',
-        name: 'Central Assembly Safe Haven',
-        description: 'High ground assembly area with medical personnel',
-        latitude: _currentLocation.latitude + 0.005,
-        longitude: _currentLocation.longitude + 0.005,
-        radiusMeters: 400,
-        status: 'OPEN',
-      ),
-      SafeZoneModel(
-        id: 'SZ-102',
-        name: 'East Stadium Safe Zone',
-        description: 'Flood relief shelter and helipad',
-        latitude: _currentLocation.latitude - 0.008,
-        longitude: _currentLocation.longitude + 0.003,
-        radiusMeters: 600,
-        status: 'OPEN',
-      ),
-    ];
+  List<SafeZoneModel> _parseSafeZones(dynamic value) {
+    if (value is! List) return [];
+    return value
+        .whereType<Map<String, dynamic>>()
+        .map((item) {
+          return SafeZoneModel.fromJson(item);
+        })
+        .where(_hasValidSafeZoneCoordinates)
+        .toList();
+  }
 
-    _shelters = [
-      ShelterModel(
-        id: 'SH-201',
-        name: 'St. Mary Disaster Relief Shelter',
-        address: '124 Emergency Way, Sector 4',
-        latitude: _currentLocation.latitude + 0.003,
-        longitude: _currentLocation.longitude - 0.006,
-        capacity: 350,
-        currentOccupants: 120,
-        amenities: ['Food', 'Water', 'Medical', 'Power Generators'],
-      ),
-      ShelterModel(
-        id: 'SH-202',
-        name: 'Civic Community Shelter',
-        address: '89 North Ave',
-        latitude: _currentLocation.latitude - 0.004,
-        longitude: _currentLocation.longitude - 0.004,
-        capacity: 200,
-        currentOccupants: 180,
-        amenities: ['Food', 'Beds', 'First Aid'],
-      ),
-    ];
+  List<ShelterModel> _parseShelters(dynamic value) {
+    if (value is! List) return [];
+    return value
+        .whereType<Map<String, dynamic>>()
+        .map((item) {
+          return ShelterModel.fromJson(item);
+        })
+        .where(_hasValidShelterCoordinates)
+        .toList();
+  }
 
-    _victims = [
-      SosModel(
-        sosId: 'SOS-V1',
-        userId: 'U1',
-        userName: 'John Doe',
-        userPhone: '+1987654321',
-        latitude: _currentLocation.latitude + 0.002,
-        longitude: _currentLocation.longitude + 0.002,
-        severity: 'CRITICAL',
-        status: 'ACTIVE',
-        notes: 'Trapped in building ground floor due to rising water.',
-      ),
-    ];
+  List<SosModel> _parseVictims(dynamic value) {
+    if (value is! List) return [];
+    return value.whereType<Map<String, dynamic>>().map((item) {
+      return SosModel.fromJson(item);
+    }).toList();
+  }
+
+  bool _hasValidSafeZoneCoordinates(SafeZoneModel zone) {
+    return _hasValidCoordinates(zone.latitude, zone.longitude);
+  }
+
+  bool _hasValidShelterCoordinates(ShelterModel shelter) {
+    return _hasValidCoordinates(shelter.latitude, shelter.longitude);
+  }
+
+  bool _hasValidCoordinates(double latitude, double longitude) {
+    return latitude != 0 &&
+        longitude != 0 &&
+        latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180;
   }
 
   void toggleSafeZones(bool val) {

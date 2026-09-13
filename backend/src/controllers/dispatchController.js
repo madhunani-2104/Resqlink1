@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const SosAlert = require('../models/SosAlert');
+const HelpReward = require('../models/HelpReward');
 const { canTransition, isDispatchableStatus } = require('../utils/dispatchUtils');
 
 const emitDispatchUpdate = (req, alert) => {
@@ -98,11 +99,34 @@ const updateDispatchStatus = async (req, res, next) => {
       return res.status(409).json({ success: false, message: 'SOS must be assigned before resolution' });
     }
 
+    const helperId = alert.respondedBy || alert.assignedResponder || (isResponder ? req.user._id : null);
+    if (nextStatus === 'RESOLVED' && helperId && helperId.toString() === alert.userId.toString()) {
+      return res.status(403).json({ success: false, message: 'A user cannot receive rescue points for their own SOS' });
+    }
+
     alert.status = nextStatus;
     alert.dispatchUpdatedAt = new Date();
     if (nextStatus === 'ACKNOWLEDGED') alert.acknowledgedAt = new Date();
     if (nextStatus === 'RESOLVED' || nextStatus === 'CANCELLED') alert.resolvedAt = new Date();
     await alert.save();
+
+    if (nextStatus === 'RESOLVED' && helperId) {
+      const configuredPoints = Number.parseInt(
+        process.env.RESCUE_HELP_POINTS || '10',
+        10,
+      );
+      const rewardPoints = Number.isFinite(configuredPoints) && configuredPoints > 0
+        ? configuredPoints
+        : 10;
+      try {
+        await HelpReward.create({ sosId: alert._id, helperId, points: rewardPoints });
+        await User.findByIdAndUpdate(helperId, {
+          $inc: { helpPoints: rewardPoints, rescuesCompleted: 1 },
+        });
+      } catch (rewardError) {
+        if (rewardError?.code !== 11000) throw rewardError;
+      }
+    }
 
     if (alert.assignedResponder && ['RESOLVED', 'CANCELLED'].includes(nextStatus)) {
       await User.findByIdAndUpdate(alert.assignedResponder, { availabilityStatus: 'AVAILABLE' });

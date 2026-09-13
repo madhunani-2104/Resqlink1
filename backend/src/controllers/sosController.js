@@ -675,10 +675,48 @@ const cancelSosAlert = async (
   }
 };
 
+const getRescueActivities = async (req, res, next) => {
+  try {
+    const rewards = await HelpReward.find({ helperId: req.user._id })
+      .populate('helperId', 'name role')
+      .populate('sosId')
+      .sort({ rewardedAt: -1 });
+
+    const activities = rewards
+      .filter((reward) => reward.sosId)
+      .map((reward) => {
+        const alert = reward.sosId;
+        return {
+          id: reward._id,
+          rescuer: reward.helperId,
+          emergencyType: 'SOS',
+          identifiedBy: alert.riskReason || `Severity ${alert.severity}`,
+          actionsTaken: 'SOS acknowledged and resolved',
+          outcome: alert.status,
+          victim: { id: alert.userId, name: alert.userName },
+          location: alert.location,
+          hazard: {
+            severity: alert.severity,
+            riskLevel: alert.riskLevel,
+            riskScore: alert.riskScore,
+          },
+          completedAt: alert.resolvedAt || reward.rewardedAt,
+          feedback: null,
+          points: reward.points,
+        };
+      });
+
+    res.json({ success: true, data: activities });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createSosAlert,
   getActiveSosAlerts,
   acknowledgeSosAlert,
   resolveSosAlert,
   cancelSosAlert,
+  getRescueActivities,
 };
