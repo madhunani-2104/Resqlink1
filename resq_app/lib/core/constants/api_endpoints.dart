@@ -21,7 +21,7 @@ class ApiEndpoints {
   // NOT only:
   // localhost:5000
 
-  static const String baseUrl = 'http://192.168.0.128:5000/api';
+  static const String baseUrl = 'https://resq-backend-zgnr.onrender.com/api';
 
   static const String webBaseUrl = 'http://localhost:5000/api';
 

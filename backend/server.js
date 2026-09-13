@@ -33,9 +33,6 @@ const io = socketio(server, {
 // Attach socket.io instance to app for controller access
 app.set('socketio', io);
 
-// Connect to Database
-connectDB();
-
 // Setup Express Middlewares
 app.use(helmet({ crossOriginResourcePolicy: false }));
 const corsOptions = {
@@ -85,15 +82,28 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-// Listen on all network interfaces so the phone can access the backend
-if (process.env.NODE_ENV !== 'test') {
-  server.listen(PORT, '0.0.0.0', () => {
-    logger.info(
-      `Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`
-    );
-    logger.info(`Local: http://localhost:${PORT}`);
-    logger.info(`Network: http://0.0.0.0:${PORT}`);
-  });
-}
+const startServer = async () => {
+  try {
+    await connectDB();
 
-module.exports = { app, server };
+    if (process.env.NODE_ENV !== 'test') {
+      server.listen(PORT, '0.0.0.0', () => {
+        logger.info(
+          `Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`
+        );
+        logger.info(`Local: http://localhost:${PORT}`);
+        logger.info(`Network: http://0.0.0.0:${PORT}`);
+      });
+    }
+  } catch (error) {
+    logger.error(`[STARTUP] Server initialization aborted: ${error.message}`);
+
+    if (process.env.NODE_ENV !== 'test') {
+      process.exitCode = 1;
+    }
+  }
+};
+
+startServer();
+
+module.exports = { app, server, startServer };
